@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "ECFC Présences",
+    "slug": "ecfc-attendance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "ecfc",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B7A3B"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ch.etoilecarougefc.attendance"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B7A3B"
+      },
+      "package": "ch.etoilecarougefc.attendance"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

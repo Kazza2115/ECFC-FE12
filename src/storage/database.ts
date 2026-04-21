@@ -1,0 +1,74 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { Attendance, Player, Session } from '@/types';
+
+const KEYS = {
+  players: 'ecfc:players',
+  sessions: 'ecfc:sessions',
+  attendances: 'ecfc:attendances',
+  seeded: 'ecfc:seeded',
+};
+
+async function readJSON<T>(key: string, fallback: T): Promise<T> {
+  const raw = await AsyncStorage.getItem(key);
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+async function writeJSON<T>(key: string, value: T): Promise<void> {
+  await AsyncStorage.setItem(key, JSON.stringify(value));
+}
+
+export const db = {
+  async getPlayers(): Promise<Player[]> {
+    return readJSON<Player[]>(KEYS.players, []);
+  },
+  async savePlayers(players: Player[]): Promise<void> {
+    await writeJSON(KEYS.players, players);
+  },
+  async getSessions(): Promise<Session[]> {
+    return readJSON<Session[]>(KEYS.sessions, []);
+  },
+  async saveSessions(sessions: Session[]): Promise<void> {
+    await writeJSON(KEYS.sessions, sessions);
+  },
+  async getAttendances(): Promise<Attendance[]> {
+    return readJSON<Attendance[]>(KEYS.attendances, []);
+  },
+  async saveAttendances(attendances: Attendance[]): Promise<void> {
+    await writeJSON(KEYS.attendances, attendances);
+  },
+  async wasSeeded(): Promise<boolean> {
+    const v = await AsyncStorage.getItem(KEYS.seeded);
+    return v === '1';
+  },
+  async markSeeded(): Promise<void> {
+    await AsyncStorage.setItem(KEYS.seeded, '1');
+  },
+  async resetAll(): Promise<void> {
+    await AsyncStorage.multiRemove([
+      KEYS.players,
+      KEYS.sessions,
+      KEYS.attendances,
+      KEYS.seeded,
+    ]);
+  },
+};
+
+export const SEED_PLAYERS = [
+  'Léo Martin',
+  'Noah Dupont',
+  'Hugo Fernandez',
+  'Liam Rossi',
+  'Ethan Müller',
+  'Adam Benali',
+  'Lucas Ribeiro',
+  'Nolan Schmid',
+  'Arthur Bonnard',
+  'Gabriel Perez',
+  'Mateo Silva',
+  'Tom Favre',
+];
