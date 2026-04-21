@@ -16,6 +16,7 @@ export type Session = {
   startedAt?: string;
   endedAt?: string;
   startingLineup?: string[];
+  lineupPositions?: Record<string, PlayerPosition>;
   createdAt: string;
 };
 

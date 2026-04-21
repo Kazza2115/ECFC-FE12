@@ -52,7 +52,8 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     getPlayerMatchTotals,
     getSessionStints,
     getPlayerPlayMs,
-    toggleLineup,
+    setLineupPosition,
+    removeFromLineup,
     startMatch,
     endMatch,
     putOnPitch,
@@ -113,13 +114,16 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   }, [started, session, sessionStints]);
 
   const currentPosition = (playerId: string): PlayerPosition | undefined => {
-    const open = sessionStints
-      .filter((st) => st.playerId === playerId && !st.endAt)
-      .sort(
-        (a, b) =>
-          new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
-      )[0];
-    return open?.position;
+    if (started) {
+      const open = sessionStints
+        .filter((st) => st.playerId === playerId && !st.endAt)
+        .sort(
+          (a, b) =>
+            new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+        )[0];
+      return open?.position;
+    }
+    return session?.lineupPositions?.[playerId];
   };
 
   const handleTogglePitch = async (player: Player) => {
@@ -128,19 +132,41 @@ export function MatchLiveScreen({ route, navigation }: Props) {
       await Haptics.selectionAsync();
     } catch {}
     if (onPitch) {
-      await takeOffPitch(sessionId, player.id);
+      if (started) {
+        await takeOffPitch(sessionId, player.id);
+      } else {
+        await removeFromLineup(sessionId, player.id);
+      }
       return;
     }
-    if (!started) {
-      await toggleLineup(sessionId, player.id);
-      return;
-    }
+    // Adding a player to the pitch — always ask for position
     setPositionSheet({
       player,
-      mode: 'substitute',
+      mode: started ? 'substitute' : 'lineup',
       onSelect: async (pos) => {
         setPositionSheet(null);
-        await putOnPitch(sessionId, player.id, pos);
+        if (started) {
+          await putOnPitch(sessionId, player.id, pos);
+        } else {
+          await setLineupPosition(sessionId, player.id, pos);
+        }
+      },
+    });
+  };
+
+  const handleChangePosition = (player: Player) => {
+    setPositionSheet({
+      player,
+      mode: started ? 'substitute' : 'lineup',
+      onSelect: async (pos) => {
+        setPositionSheet(null);
+        if (started) {
+          // Close current stint and reopen with new position for precise tracking
+          await takeOffPitch(sessionId, player.id);
+          await putOnPitch(sessionId, player.id, pos);
+        } else {
+          await setLineupPosition(sessionId, player.id, pos);
+        }
       },
     });
   };
@@ -277,6 +303,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                   totals={getPlayerMatchTotals(player.id, sessionId)}
                   position={currentPosition(player.id)}
                   onTogglePitch={() => handleTogglePitch(player)}
+                  onChangePosition={() => handleChangePosition(player)}
                   onEvent={() => setEventSheet({ player })}
                 />
               ))
@@ -301,6 +328,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                   totals={getPlayerMatchTotals(player.id, sessionId)}
                   position={undefined}
                   onTogglePitch={() => handleTogglePitch(player)}
+                  onChangePosition={() => handleChangePosition(player)}
                   onEvent={() => setEventSheet({ player })}
                 />
               ))
@@ -417,6 +445,7 @@ function PlayerCard({
   totals,
   position,
   onTogglePitch,
+  onChangePosition,
   onEvent,
 }: {
   player: Player;
@@ -427,96 +456,114 @@ function PlayerCard({
   totals: { goals: number; assists: number; key: number; yellow: number; red: number };
   position: PlayerPosition | undefined;
   onTogglePitch: () => void;
+  onChangePosition: () => void;
   onEvent: () => void;
 }) {
   const hasEvents =
     totals.goals + totals.assists + totals.key + totals.yellow + totals.red > 0;
+  const posMeta = position ? POSITION_META[position] : null;
 
   return (
-    <Card style={[styles.playerCard, onPitch && styles.playerCardActive]}>
+    <Card
+      padded={false}
+      style={[styles.playerCard, onPitch && styles.playerCardActive]}
+    >
       <View style={styles.playerTop}>
-        <Avatar name={player.name} photoUri={player.photoUri} size={44} />
+        <Avatar name={player.name} photoUri={player.photoUri} size={52} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={styles.playerNameRow}>
-            <Text style={styles.playerName} numberOfLines={1}>
-              {player.name}
-            </Text>
-            {position ? (
-              <View
+          <Text style={styles.playerName} numberOfLines={1}>
+            {player.name}
+          </Text>
+          {onPitch ? (
+            <Pressable
+              onPress={onChangePosition}
+              disabled={ended}
+              style={[
+                styles.positionBadge,
+                posMeta
+                  ? { backgroundColor: posMeta.bg }
+                  : styles.positionBadgeEmpty,
+              ]}
+            >
+              <Text
                 style={[
-                  styles.positionBadge,
-                  { backgroundColor: POSITION_META[position].bg },
+                  styles.positionBadgeLabel,
+                  posMeta
+                    ? { color: posMeta.color }
+                    : { color: colors.textSecondary },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.positionBadgeLabel,
-                    { color: POSITION_META[position].color },
-                  ]}
-                >
-                  {POSITION_META[position].short}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.playerMeta}>
+                {posMeta
+                  ? `${posMeta.short} · ${posMeta.label}`
+                  : 'Ajouter un poste'}
+              </Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.playerMetaMuted}>Sur le banc</Text>
+          )}
+        </View>
+      </View>
+
+      {onPitch ? (
+        <View style={styles.playerClock}>
+          <Text style={styles.playerClockValue}>
+            {started ? formatDuration(playMs) : '—'}
+          </Text>
+          <Text style={styles.playerClockLabel}>
             {started
-              ? `${formatDuration(playMs)} joué${onPitch && !ended ? ' · en cours' : ''}`
-              : onPitch
-              ? 'Titulaire'
-              : 'Sur le banc'}
+              ? onPitch && !ended
+                ? 'Temps de jeu · en cours'
+                : 'Temps de jeu'
+              : 'Titulaire (match non démarré)'}
           </Text>
         </View>
+      ) : null}
+
+      <View style={styles.playerActions}>
         <Pressable
           disabled={ended}
           onPress={onTogglePitch}
           style={[
             styles.pitchToggle,
-            onPitch ? styles.pitchToggleOn : styles.pitchToggleOff,
+            onPitch ? styles.pitchToggleOff : styles.pitchToggleOn,
             ended && styles.pitchToggleDisabled,
           ]}
         >
           <Text
             style={[
               styles.pitchToggleLabel,
-              onPitch ? styles.pitchToggleLabelOn : styles.pitchToggleLabelOff,
+              onPitch ? styles.pitchToggleLabelDark : styles.pitchToggleLabelLight,
             ]}
           >
-            {onPitch
-              ? started
-                ? 'Banc'
-                : 'Titulaire'
-              : started
-              ? 'Terrain'
-              : 'Titulaire'}
+            {onPitch ? '↓ Sur le banc' : started ? '↑ Sur le terrain' : '↑ Titulaire'}
           </Text>
         </Pressable>
-      </View>
-
-      <View style={styles.playerBottom}>
-        <Pressable onPress={onEvent} style={styles.eventBtn}>
-          <Text style={styles.eventBtnLabel}>⚡ Évènement</Text>
-        </Pressable>
-        {hasEvents ? (
-          <View style={styles.totalsRow}>
-            {totals.goals > 0 ? (
-              <TotalPill color={EVENT_META.goal.color} glyph={EVENT_META.goal.glyph} value={totals.goals} />
-            ) : null}
-            {totals.assists > 0 ? (
-              <TotalPill color={EVENT_META.assist.color} glyph={EVENT_META.assist.glyph} value={totals.assists} />
-            ) : null}
-            {totals.key > 0 ? (
-              <TotalPill color={EVENT_META.key.color} glyph={EVENT_META.key.glyph} value={totals.key} />
-            ) : null}
-            {totals.yellow > 0 ? (
-              <TotalPill color={EVENT_META.yellow.color} glyph={EVENT_META.yellow.glyph} value={totals.yellow} />
-            ) : null}
-            {totals.red > 0 ? (
-              <TotalPill color={EVENT_META.red.color} glyph={EVENT_META.red.glyph} value={totals.red} />
-            ) : null}
-          </View>
+        {onPitch ? (
+          <Pressable onPress={onEvent} style={styles.eventBtn}>
+            <Text style={styles.eventBtnLabel}>⚡ Évènement</Text>
+          </Pressable>
         ) : null}
       </View>
+
+      {hasEvents ? (
+        <View style={styles.totalsRow}>
+          {totals.goals > 0 ? (
+            <TotalPill color={EVENT_META.goal.color} glyph={EVENT_META.goal.glyph} value={totals.goals} />
+          ) : null}
+          {totals.assists > 0 ? (
+            <TotalPill color={EVENT_META.assist.color} glyph={EVENT_META.assist.glyph} value={totals.assists} />
+          ) : null}
+          {totals.key > 0 ? (
+            <TotalPill color={EVENT_META.key.color} glyph={EVENT_META.key.glyph} value={totals.key} />
+          ) : null}
+          {totals.yellow > 0 ? (
+            <TotalPill color={EVENT_META.yellow.color} glyph={EVENT_META.yellow.glyph} value={totals.yellow} />
+          ) : null}
+          {totals.red > 0 ? (
+            <TotalPill color={EVENT_META.red.color} glyph={EVENT_META.red.glyph} value={totals.red} />
+          ) : null}
+        </View>
+      ) : null}
     </Card>
   );
 }
@@ -571,47 +618,77 @@ const styles = StyleSheet.create({
   playerCard: {
     borderLeftWidth: 4,
     borderLeftColor: colors.border,
-    gap: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.md,
+    backgroundColor: colors.surface,
   },
   playerCardActive: {
-    borderLeftColor: colors.primary,
-    backgroundColor: colors.surface,
+    borderLeftColor: colors.success,
+    borderLeftWidth: 6,
+    backgroundColor: '#F0FDF4',
   },
   playerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
   },
-  playerNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
   playerName: {
     ...typography.bodyBold,
     color: colors.textPrimary,
-    fontSize: 16,
+    fontSize: 18,
     flexShrink: 1,
   },
   positionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: radius.pill,
+    marginTop: 4,
+  },
+  positionBadgeEmpty: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
   },
   positionBadgeLabel: {
     ...typography.caption,
     fontWeight: '800',
-    fontSize: 11,
+    fontSize: 12,
   },
-  playerMeta: {
+  playerMetaMuted: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 4,
+  },
+  playerClock: {
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    alignItems: 'flex-start',
+  },
+  playerClockValue: {
+    ...typography.number,
+    fontSize: 30,
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  playerClockLabel: {
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: 2,
   },
+  playerActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   pitchToggle: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pitchToggleOn: { backgroundColor: colors.primary },
   pitchToggleOff: {
@@ -622,24 +699,19 @@ const styles = StyleSheet.create({
   pitchToggleDisabled: { opacity: 0.4 },
   pitchToggleLabel: {
     ...typography.bodyBold,
-    fontSize: 13,
+    fontSize: 14,
   },
-  pitchToggleLabelOn: { color: '#FFFFFF' },
-  pitchToggleLabelOff: { color: colors.textPrimary },
-  playerBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
+  pitchToggleLabelLight: { color: '#FFFFFF' },
+  pitchToggleLabelDark: { color: colors.textPrimary },
   eventBtn: {
     paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+    paddingVertical: 12,
+    borderRadius: radius.md,
     backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  eventBtnLabel: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  eventBtnLabel: { color: colors.primary, fontWeight: '800', fontSize: 14 },
   totalsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   totalPill: {
     flexDirection: 'row',

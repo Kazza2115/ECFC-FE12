@@ -27,6 +27,7 @@ type DbSession = {
   started_at: string | null;
   ended_at: string | null;
   starting_lineup: string[] | null;
+  lineup_positions: Record<string, string> | null;
   team_id: string;
   created_at: string;
   updated_at: string;
@@ -94,6 +95,8 @@ function toDbSession(s: Session): DbSession {
     started_at: s.startedAt ?? null,
     ended_at: s.endedAt ?? null,
     starting_lineup: s.startingLineup ?? null,
+    lineup_positions:
+      (s.lineupPositions as Record<string, string>) ?? null,
     team_id: TEAM_ID,
     created_at: s.createdAt,
     updated_at: now(),
@@ -110,6 +113,8 @@ function fromDbSession(row: DbSession): Session {
     startedAt: row.started_at ?? undefined,
     endedAt: row.ended_at ?? undefined,
     startingLineup: row.starting_lineup ?? undefined,
+    lineupPositions:
+      (row.lineup_positions as Session['lineupPositions']) ?? undefined,
     createdAt: row.created_at,
   };
 }

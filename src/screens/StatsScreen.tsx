@@ -24,6 +24,17 @@ import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { buildAttendanceCSV } from '@/utils/csv';
 import type { MatchEventType, PlayerMatchTotals } from '@/types';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
+import { useNavigation } from '@react-navigation/native';
+import { formatDate } from '@/utils/date';
+
+type StatsNav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Stats'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type Tab = 'training' | 'match';
 
@@ -139,6 +150,7 @@ export function StatsScreen() {
           )
         ) : hasMatchData ? (
           <MatchView
+            sessions={sessions}
             players={players}
             matchCallUps={matchCallUps}
             matchEvents={matchEvents}
@@ -321,6 +333,7 @@ function formatMinutes(ms: number): string {
 }
 
 function MatchView({
+  sessions,
   players,
   matchCallUps,
   matchEvents,
@@ -328,6 +341,7 @@ function MatchView({
   getPlayerMatchTotals,
   getPlayerPlayMs,
 }: {
+  sessions: ReturnType<typeof useData>['sessions'];
   players: ReturnType<typeof useData>['players'];
   matchCallUps: ReturnType<typeof useData>['matchCallUps'];
   matchEvents: ReturnType<typeof useData>['matchEvents'];
@@ -335,6 +349,35 @@ function MatchView({
   getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
   getPlayerPlayMs: (playerId: string, sessionId?: string, now?: number) => number;
 }) {
+  const navigation = useNavigation<StatsNav>();
+
+  const matchSessions = useMemo(
+    () =>
+      sessions
+        .filter((s) => s.kind === 'match' && !s.cancelled)
+        .sort(
+          (a, b) =>
+            new Date(b.date).getTime() - new Date(a.date).getTime(),
+        ),
+    [sessions],
+  );
+
+  const matchSummary = useMemo(() => {
+    const summary = new Map<
+      string,
+      { goals: number; cards: number; events: number }
+    >();
+    for (const s of matchSessions)
+      summary.set(s.id, { goals: 0, cards: 0, events: 0 });
+    for (const e of matchEvents) {
+      const bucket = summary.get(e.sessionId);
+      if (!bucket) continue;
+      bucket.events += 1;
+      if (e.type === 'goal') bucket.goals += 1;
+      if (e.type === 'yellow' || e.type === 'red') bucket.cards += 1;
+    }
+    return summary;
+  }, [matchSessions, matchEvents]);
   const playerTotals = useMemo(() => {
     return players
       .map((p) => ({
@@ -385,6 +428,52 @@ function MatchView({
 
   return (
     <>
+      <Text style={styles.sectionTitle}>Feuilles de match</Text>
+      <Card padded={false} style={styles.listCard}>
+        {matchSessions.map((s, index) => {
+          const bucket = matchSummary.get(s.id);
+          return (
+            <Pressable
+              key={s.id}
+              onPress={() =>
+                navigation.navigate('MatchSheet', { sessionId: s.id })
+              }
+              style={[
+                styles.matchRow,
+                index < matchSessions.length - 1 && styles.rowDivider,
+              ]}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.matchTitle}>
+                  {s.label ? `vs ${s.label}` : 'Match'}
+                </Text>
+                <Text style={styles.matchDate}>
+                  {formatDate(s.date)}
+                  {s.endedAt ? ' · terminé' : s.startedAt ? ' · en cours' : ' · à venir'}
+                </Text>
+              </View>
+              <View style={styles.matchSummaryRow}>
+                {bucket && bucket.goals > 0 ? (
+                  <View style={[styles.matchSummaryPill, { backgroundColor: EVENT_META.goal.bg }]}>
+                    <Text style={{ color: EVENT_META.goal.color, fontWeight: '800', fontSize: 12 }}>
+                      {bucket.goals} {EVENT_META.goal.glyph}
+                    </Text>
+                  </View>
+                ) : null}
+                {bucket && bucket.cards > 0 ? (
+                  <View style={[styles.matchSummaryPill, { backgroundColor: EVENT_META.yellow.bg }]}>
+                    <Text style={{ color: EVENT_META.yellow.color, fontWeight: '800', fontSize: 12 }}>
+                      {bucket.cards} 🟨
+                    </Text>
+                  </View>
+                ) : null}
+                <Text style={styles.matchArrow}>›</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </Card>
+
       <Card style={styles.hero}>
         <Text style={styles.heroTitle}>Saison</Text>
         <Text style={styles.heroHint}>
@@ -688,6 +777,30 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   listCard: {},
+  matchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  matchTitle: { ...typography.bodyBold, color: colors.textPrimary, fontSize: 15 },
+  matchDate: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  matchSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  matchSummaryPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  matchArrow: {
+    color: colors.textMuted,
+    fontSize: 22,
+    marginLeft: 4,
+    marginRight: -4,
+  },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

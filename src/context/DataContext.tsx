@@ -56,6 +56,8 @@ type DataContextValue = {
   getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
   setStartingLineup: (sessionId: string, playerIds: string[]) => Promise<void>;
   toggleLineup: (sessionId: string, playerId: string) => Promise<void>;
+  setLineupPosition: (sessionId: string, playerId: string, position: PlayerPosition | undefined) => Promise<void>;
+  removeFromLineup: (sessionId: string, playerId: string) => Promise<void>;
   startMatch: (sessionId: string) => Promise<void>;
   endMatch: (sessionId: string) => Promise<void>;
   putOnPitch: (sessionId: string, playerId: string, position?: PlayerPosition) => Promise<void>;
@@ -522,6 +524,76 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [sessions, setStartingLineup],
   );
 
+  const setLineupPosition = useCallback(
+    async (
+      sessionId: string,
+      playerId: string,
+      position: PlayerPosition | undefined,
+    ) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const nextLineup = (session.startingLineup ?? []).includes(playerId)
+        ? (session.startingLineup ?? [])
+        : [...(session.startingLineup ?? []), playerId];
+      const nextPositions: Record<string, PlayerPosition> = {
+        ...(session.lineupPositions ?? {}),
+      };
+      if (position) {
+        nextPositions[playerId] = position;
+      } else {
+        delete nextPositions[playerId];
+      }
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              startingLineup: nextLineup,
+              lineupPositions: nextPositions,
+            }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('setLineupPosition', () => remote.upsertSession(changed));
+      }
+    },
+    [sessions],
+  );
+
+  const removeFromLineup = useCallback(
+    async (sessionId: string, playerId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const nextLineup = (session.startingLineup ?? []).filter(
+        (id) => id !== playerId,
+      );
+      const nextPositions: Record<string, PlayerPosition> = {
+        ...(session.lineupPositions ?? {}),
+      };
+      delete nextPositions[playerId];
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              startingLineup: nextLineup,
+              lineupPositions: nextPositions,
+            }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('removeFromLineup', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
+
   const startMatch = useCallback(
     async (sessionId: string) => {
       const session = sessions.find((s) => s.id === sessionId);
@@ -536,10 +608,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       await db.saveSessions(nextSessions);
 
       const lineupIds = session.startingLineup ?? [];
+      const positions = session.lineupPositions ?? {};
       const newStints: PlayerStint[] = lineupIds.map((playerId) => ({
         id: uid(),
         sessionId,
         playerId,
+        position: positions[playerId],
         startAt: startedAt,
       }));
       if (newStints.length > 0) {
@@ -805,6 +879,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     getPlayerMatchTotals,
     setStartingLineup,
     toggleLineup,
+    setLineupPosition,
+    removeFromLineup,
     startMatch,
     endMatch,
     putOnPitch,
