@@ -12,6 +12,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ClubLogo } from '@/components/ClubLogo';
+import { SyncPill } from '@/components/SyncPill';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -36,6 +37,8 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     globalRatio,
     activeSessionsCount,
     createSession,
+    syncStatus,
+    refreshFromCloud,
   } = useData();
 
   const topPlayers = playerStats.slice(0, 5);
@@ -74,7 +77,10 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             <Text style={styles.greeting}>Bonjour Coach</Text>
             <Text style={styles.subtitle}>Étoile Carouge FC · Juniors</Text>
           </View>
-          <ClubLogo size={48} />
+          <View style={styles.headerRight}>
+            <SyncPill status={syncStatus} onRefresh={refreshFromCloud} />
+            <ClubLogo size={48} />
+          </View>
         </View>
 
         <Card style={styles.heroCard}>
@@ -206,6 +212,11 @@ const styles = StyleSheet.create({
   },
   greeting: { ...typography.h1, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   heroCard: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.sm,

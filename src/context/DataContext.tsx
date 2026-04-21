@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { db, SEED_PLAYERS } from '@/storage/database';
+import { remote } from '@/storage/remote';
 import { STATUS_META, DEFAULT_STATUS } from '@/constants/statuses';
 import { uid } from '@/utils/id';
 import { todayISO } from '@/utils/date';
@@ -11,6 +12,8 @@ import type {
   Session,
   SessionKind,
 } from '@/types';
+
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
 
 type DataContextValue = {
   loading: boolean;
@@ -31,6 +34,9 @@ type DataContextValue = {
   playerStats: PlayerStats[];
   globalRatio: number;
   activeSessionsCount: number;
+  syncStatus: SyncStatus;
+  lastSyncedAt: string | null;
+  refreshFromCloud: () => Promise<void>;
   resetAll: () => Promise<void>;
 };
 
@@ -41,40 +47,136 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+
+  const warn = (context: string, err: unknown) => {
+    if (typeof console !== 'undefined') {
+      console.warn(`[sync:${context}]`, err);
+    }
+  };
+
+  const markSynced = () => {
+    setSyncStatus('synced');
+    setLastSyncedAt(new Date().toISOString());
+  };
 
   useEffect(() => {
     (async () => {
-      const seeded = await db.wasSeeded();
-      if (!seeded) {
-        const seedPlayers: Player[] = SEED_PLAYERS.map((name) => ({
-          id: uid(),
-          name,
-          createdAt: todayISO(),
-        }));
-        await db.savePlayers(seedPlayers);
-        await db.markSeeded();
-        setPlayers(seedPlayers);
-        setSessions([]);
-        setAttendances([]);
-      } else {
-        const [p, s, a] = await Promise.all([
+      const [cachedPlayers, cachedSessions, cachedAttendances, seeded] =
+        await Promise.all([
           db.getPlayers(),
           db.getSessions(),
           db.getAttendances(),
+          db.wasSeeded(),
         ]);
-        setPlayers(p);
-        setSessions(s);
-        setAttendances(migrateAttendances(a));
-      }
+
+      setPlayers(cachedPlayers);
+      setSessions(cachedSessions);
+      setAttendances(migrateAttendances(cachedAttendances));
       setLoading(false);
+
+      setSyncStatus('syncing');
+      try {
+        const snap = await remote.fetchAll();
+
+        if (snap.players.length > 0 || snap.sessions.length > 0) {
+          setPlayers(snap.players);
+          setSessions(
+            snap.sessions.sort(
+              (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+            ),
+          );
+          setAttendances(snap.attendances);
+          await Promise.all([
+            db.savePlayers(snap.players),
+            db.saveSessions(snap.sessions),
+            db.saveAttendances(snap.attendances),
+            db.markSeeded(),
+          ]);
+        } else if (cachedPlayers.length === 0 && !seeded) {
+          const seedPlayers: Player[] = SEED_PLAYERS.map((name) => ({
+            id: uid(),
+            name,
+            createdAt: todayISO(),
+          }));
+          setPlayers(seedPlayers);
+          await Promise.all([
+            db.savePlayers(seedPlayers),
+            db.markSeeded(),
+          ]);
+          try {
+            for (const p of seedPlayers) await remote.upsertPlayer(p);
+          } catch (err) {
+            warn('seed-push', err);
+          }
+        } else if (cachedPlayers.length > 0) {
+          try {
+            for (const p of cachedPlayers) await remote.upsertPlayer(p);
+            for (const s of cachedSessions) await remote.upsertSession(s);
+            if (cachedAttendances.length > 0) {
+              await remote.upsertAttendances(cachedAttendances);
+            }
+          } catch (err) {
+            warn('initial-push', err);
+          }
+        }
+
+        markSynced();
+      } catch (err) {
+        warn('initial-fetch', err);
+        setSyncStatus('offline');
+      }
     })();
   }, []);
 
+  const refreshFromCloud = useCallback(async () => {
+    setSyncStatus('syncing');
+    try {
+      const snap = await remote.fetchAll();
+      setPlayers(snap.players);
+      setSessions(
+        snap.sessions.sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        ),
+      );
+      setAttendances(snap.attendances);
+      await Promise.all([
+        db.savePlayers(snap.players),
+        db.saveSessions(snap.sessions),
+        db.saveAttendances(snap.attendances),
+      ]);
+      markSynced();
+    } catch (err) {
+      warn('refresh', err);
+      setSyncStatus('offline');
+    }
+  }, []);
+
+  const pushSafe = async (
+    label: string,
+    fn: () => Promise<void>,
+  ): Promise<void> => {
+    setSyncStatus('syncing');
+    try {
+      await fn();
+      markSynced();
+    } catch (err) {
+      warn(label, err);
+      setSyncStatus('offline');
+    }
+  };
+
   const addPlayer = useCallback(async (name: string) => {
-    const player: Player = { id: uid(), name: name.trim(), createdAt: todayISO() };
+    const player: Player = {
+      id: uid(),
+      name: name.trim(),
+      createdAt: todayISO(),
+    };
     const next = [...players, player];
     setPlayers(next);
     await db.savePlayers(next);
+    await pushSafe('upsertPlayer', () => remote.upsertPlayer(player));
     return player;
   }, [players]);
 
@@ -87,18 +189,57 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       db.savePlayers(nextPlayers),
       db.saveAttendances(nextAttendances),
     ]);
+    await pushSafe('deletePlayer', async () => {
+      await remote.deleteAttendancesForPlayer(id);
+      await remote.deletePlayer(id);
+      try {
+        await remote.deletePhoto(id);
+      } catch {}
+    });
   }, [players, attendances]);
 
   const renamePlayer = useCallback(async (id: string, name: string) => {
-    const next = players.map((p) => (p.id === id ? { ...p, name: name.trim() } : p));
+    const next = players.map((p) =>
+      p.id === id ? { ...p, name: name.trim() } : p,
+    );
     setPlayers(next);
     await db.savePlayers(next);
+    const changed = next.find((p) => p.id === id);
+    if (changed) {
+      await pushSafe('renamePlayer', () => remote.upsertPlayer(changed));
+    }
   }, [players]);
 
   const setPlayerPhoto = useCallback(async (id: string, photoUri: string | undefined) => {
-    const next = players.map((p) => (p.id === id ? { ...p, photoUri } : p));
+    let finalUri = photoUri;
+    if (photoUri && photoUri.startsWith('data:')) {
+      try {
+        setSyncStatus('syncing');
+        finalUri = await remote.uploadPhoto(id, photoUri);
+      } catch (err) {
+        warn('uploadPhoto', err);
+        finalUri = photoUri;
+        setSyncStatus('offline');
+      }
+    } else if (!photoUri) {
+      try {
+        await remote.deletePhoto(id);
+      } catch (err) {
+        warn('deletePhoto', err);
+      }
+    }
+
+    const next = players.map((p) =>
+      p.id === id ? { ...p, photoUri: finalUri } : p,
+    );
     setPlayers(next);
     await db.savePlayers(next);
+    const changed = next.find((p) => p.id === id);
+    if (changed) {
+      await pushSafe('upsertPlayerPhoto', () =>
+        remote.upsertPlayer(changed),
+      );
+    }
   }, [players]);
 
   const createSession = useCallback(async (opts?: { kind?: SessionKind; label?: string; date?: string }) => {
@@ -113,6 +254,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const next = [session, ...sessions];
     setSessions(next);
     await db.saveSessions(next);
+    await pushSafe('upsertSession', () => remote.upsertSession(session));
     return session;
   }, [sessions]);
 
@@ -125,6 +267,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       db.saveSessions(nextSessions),
       db.saveAttendances(nextAttendances),
     ]);
+    await pushSafe('deleteSession', async () => {
+      await remote.deleteAttendancesForSession(id);
+      await remote.deleteSession(id);
+    });
   }, [sessions, attendances]);
 
   const toggleCancelled = useCallback(async (sessionId: string) => {
@@ -133,21 +279,27 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     );
     setSessions(next);
     await db.saveSessions(next);
+    const changed = next.find((s) => s.id === sessionId);
+    if (changed) {
+      await pushSafe('toggleCancelled', () => remote.upsertSession(changed));
+    }
   }, [sessions]);
 
   const setAttendance = useCallback(async (sessionId: string, playerId: string, status: AttendanceStatus) => {
+    const record: Attendance = { sessionId, playerId, status };
     const existingIndex = attendances.findIndex(
       (a) => a.sessionId === sessionId && a.playerId === playerId,
     );
     let next: Attendance[];
     if (existingIndex >= 0) {
       next = attendances.slice();
-      next[existingIndex] = { sessionId, playerId, status };
+      next[existingIndex] = record;
     } else {
-      next = [...attendances, { sessionId, playerId, status }];
+      next = [...attendances, record];
     }
     setAttendances(next);
     await db.saveAttendances(next);
+    await pushSafe('upsertAttendance', () => remote.upsertAttendance(record));
   }, [attendances]);
 
   const bulkSetAttendance = useCallback(async (sessionId: string, status: AttendanceStatus) => {
@@ -160,6 +312,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const next = [...others, ...fresh];
     setAttendances(next);
     await db.saveAttendances(next);
+    await pushSafe('upsertAttendances', () => remote.upsertAttendances(fresh));
   }, [attendances, players]);
 
   const getStatus = useCallback((sessionId: string, playerId: string): AttendanceStatus => {
@@ -258,6 +411,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     playerStats,
     globalRatio,
     activeSessionsCount: activeSessions.length,
+    syncStatus,
+    lastSyncedAt,
+    refreshFromCloud,
     resetAll,
   };
 
