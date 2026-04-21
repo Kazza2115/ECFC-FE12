@@ -1,5 +1,11 @@
 import { PHOTO_BUCKET, TEAM_ID, supabase } from './supabase';
-import type { Attendance, Player, Session } from '@/types';
+import type {
+  Attendance,
+  MatchEvent,
+  MatchEventType,
+  Player,
+  Session,
+} from '@/types';
 
 type DbPlayer = {
   id: string;
@@ -26,6 +32,17 @@ type DbAttendance = {
   player_id: string;
   status: string;
   updated_at: string;
+};
+
+type DbMatchEvent = {
+  id: string;
+  session_id: string;
+  player_id: string;
+  type: string;
+  minute: number | null;
+  note: string | null;
+  team_id: string;
+  created_at: string;
 };
 
 function now(): string {
@@ -93,26 +110,58 @@ function fromDbAttendance(row: DbAttendance): Attendance {
   };
 }
 
+function toDbMatchEvent(e: MatchEvent): DbMatchEvent {
+  return {
+    id: e.id,
+    session_id: e.sessionId,
+    player_id: e.playerId,
+    type: e.type,
+    minute: e.minute ?? null,
+    note: e.note ?? null,
+    team_id: TEAM_ID,
+    created_at: e.createdAt,
+  };
+}
+
+function fromDbMatchEvent(row: DbMatchEvent): MatchEvent {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    playerId: row.player_id,
+    type: row.type as MatchEventType,
+    minute: row.minute ?? undefined,
+    note: row.note ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
 export type RemoteSnapshot = {
   players: Player[];
   sessions: Session[];
   attendances: Attendance[];
+  matchEvents: MatchEvent[];
 };
 
 export const remote = {
   async fetchAll(): Promise<RemoteSnapshot> {
-    const [pRes, sRes, aRes] = await Promise.all([
+    const [pRes, sRes, aRes, eRes] = await Promise.all([
       supabase.from('ecfc_players').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_sessions').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_attendances').select('*'),
+      supabase.from('ecfc_match_events').select('*').eq('team_id', TEAM_ID),
     ]);
     if (pRes.error) throw pRes.error;
     if (sRes.error) throw sRes.error;
     if (aRes.error) throw aRes.error;
+    if (eRes.error && eRes.error.code !== 'PGRST205' /* missing table */) {
+      // Missing-table errors on first deploy must not block other data.
+      throw eRes.error;
+    }
     return {
       players: (pRes.data ?? []).map(fromDbPlayer),
       sessions: (sRes.data ?? []).map(fromDbSession),
       attendances: (aRes.data ?? []).map(fromDbAttendance),
+      matchEvents: (eRes.data ?? []).map(fromDbMatchEvent),
     };
   },
   async upsertPlayer(p: Player): Promise<void> {
@@ -164,6 +213,33 @@ export const remote = {
   async deleteAttendancesForPlayer(playerId: string): Promise<void> {
     const { error } = await supabase
       .from('ecfc_attendances')
+      .delete()
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+  async insertMatchEvent(event: MatchEvent): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_match_events')
+      .insert(toDbMatchEvent(event));
+    if (error) throw error;
+  },
+  async deleteMatchEvent(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_match_events')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+  async deleteMatchEventsForSession(sessionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_match_events')
+      .delete()
+      .eq('session_id', sessionId);
+    if (error) throw error;
+  },
+  async deleteMatchEventsForPlayer(playerId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_match_events')
       .delete()
       .eq('player_id', playerId);
     if (error) throw error;

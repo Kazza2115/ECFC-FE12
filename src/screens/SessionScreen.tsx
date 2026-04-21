@@ -287,6 +287,18 @@ export function SessionScreen({ route, navigation }: Props) {
       />
 
       <View style={styles.footer}>
+        {isMatch && !cancelled ? (
+          <>
+            <Button
+              label="⚡ Mode Live"
+              onPress={() =>
+                navigation.navigate('MatchLive', { sessionId })
+              }
+              fullWidth
+            />
+            <View style={{ height: spacing.sm }} />
+          </>
+        ) : null}
         <Button
           label={isMatch ? 'Supprimer le match' : 'Supprimer la séance'}
           variant="ghost"

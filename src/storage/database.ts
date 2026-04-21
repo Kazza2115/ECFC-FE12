@@ -1,10 +1,11 @@
 import { kv } from './kv';
-import type { Attendance, Player, Session } from '@/types';
+import type { Attendance, MatchEvent, Player, Session } from '@/types';
 
 const KEYS = {
   players: 'ecfc:players',
   sessions: 'ecfc:sessions',
   attendances: 'ecfc:attendances',
+  matchEvents: 'ecfc:matchEvents',
   seeded: 'ecfc:seeded',
 };
 
@@ -41,6 +42,12 @@ export const db = {
   async saveAttendances(attendances: Attendance[]): Promise<void> {
     await writeJSON(KEYS.attendances, attendances);
   },
+  async getMatchEvents(): Promise<MatchEvent[]> {
+    return readJSON<MatchEvent[]>(KEYS.matchEvents, []);
+  },
+  async saveMatchEvents(events: MatchEvent[]): Promise<void> {
+    await writeJSON(KEYS.matchEvents, events);
+  },
   async wasSeeded(): Promise<boolean> {
     const v = await kv.getItem(KEYS.seeded);
     return v === '1';
@@ -53,6 +60,7 @@ export const db = {
       KEYS.players,
       KEYS.sessions,
       KEYS.attendances,
+      KEYS.matchEvents,
       KEYS.seeded,
     ]);
   },

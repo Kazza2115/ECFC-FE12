@@ -10,7 +10,10 @@ import { todayISO } from '@/utils/date';
 import type {
   Attendance,
   AttendanceStatus,
+  MatchEvent,
+  MatchEventType,
   Player,
+  PlayerMatchTotals,
   PlayerStats,
   Session,
   SessionKind,
@@ -32,6 +35,7 @@ type DataContextValue = {
   players: Player[];
   sessions: Session[];
   attendances: Attendance[];
+  matchEvents: MatchEvent[];
   addPlayer: (name: string) => Promise<Player>;
   removePlayer: (id: string) => Promise<void>;
   renamePlayer: (id: string, name: string) => Promise<void>;
@@ -43,6 +47,10 @@ type DataContextValue = {
   bulkSetAttendance: (sessionId: string, status: AttendanceStatus) => Promise<void>;
   getStatus: (sessionId: string, playerId: string) => AttendanceStatus;
   getSessionAttendance: (sessionId: string) => Attendance[];
+  addMatchEvent: (sessionId: string, playerId: string, type: MatchEventType) => Promise<MatchEvent>;
+  removeMatchEvent: (id: string) => Promise<void>;
+  getSessionEvents: (sessionId: string) => MatchEvent[];
+  getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
   playerStats: PlayerStats[];
   matchCallUps: MatchCallUp[];
   globalRatio: number;
@@ -69,6 +77,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
@@ -85,17 +94,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [cachedPlayers, cachedSessions, cachedAttendances, seeded] =
-        await Promise.all([
-          db.getPlayers(),
-          db.getSessions(),
-          db.getAttendances(),
-          db.wasSeeded(),
-        ]);
+      const [
+        cachedPlayers,
+        cachedSessions,
+        cachedAttendances,
+        cachedEvents,
+        seeded,
+      ] = await Promise.all([
+        db.getPlayers(),
+        db.getSessions(),
+        db.getAttendances(),
+        db.getMatchEvents(),
+        db.wasSeeded(),
+      ]);
 
       setPlayers(cachedPlayers);
       setSessions(cachedSessions);
       setAttendances(migrateAttendances(cachedAttendances));
+      setMatchEvents(cachedEvents);
       setLoading(false);
 
       setSyncStatus('syncing');
@@ -110,10 +126,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             ),
           );
           setAttendances(snap.attendances);
+          setMatchEvents(snap.matchEvents);
           await Promise.all([
             db.savePlayers(snap.players),
             db.saveSessions(snap.sessions),
             db.saveAttendances(snap.attendances),
+            db.saveMatchEvents(snap.matchEvents),
             db.markSeeded(),
           ]);
         } else if (cachedPlayers.length === 0 && !seeded) {
@@ -163,10 +181,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ),
       );
       setAttendances(snap.attendances);
+      setMatchEvents(snap.matchEvents);
       await Promise.all([
         db.savePlayers(snap.players),
         db.saveSessions(snap.sessions),
         db.saveAttendances(snap.attendances),
+        db.saveMatchEvents(snap.matchEvents),
       ]);
       markSynced();
     } catch (err) {
@@ -205,20 +225,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const removePlayer = useCallback(async (id: string) => {
     const nextPlayers = players.filter((p) => p.id !== id);
     const nextAttendances = attendances.filter((a) => a.playerId !== id);
+    const nextEvents = matchEvents.filter((e) => e.playerId !== id);
     setPlayers(nextPlayers);
     setAttendances(nextAttendances);
+    setMatchEvents(nextEvents);
     await Promise.all([
       db.savePlayers(nextPlayers),
       db.saveAttendances(nextAttendances),
+      db.saveMatchEvents(nextEvents),
     ]);
     await pushSafe('deletePlayer', async () => {
       await remote.deleteAttendancesForPlayer(id);
+      try {
+        await remote.deleteMatchEventsForPlayer(id);
+      } catch (err) {
+        warn('deleteMatchEventsForPlayer', err);
+      }
       await remote.deletePlayer(id);
       try {
         await remote.deletePhoto(id);
       } catch {}
     });
-  }, [players, attendances]);
+  }, [players, attendances, matchEvents]);
 
   const renamePlayer = useCallback(async (id: string, name: string) => {
     const next = players.map((p) =>
@@ -283,17 +311,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const deleteSession = useCallback(async (id: string) => {
     const nextSessions = sessions.filter((s) => s.id !== id);
     const nextAttendances = attendances.filter((a) => a.sessionId !== id);
+    const nextEvents = matchEvents.filter((e) => e.sessionId !== id);
     setSessions(nextSessions);
     setAttendances(nextAttendances);
+    setMatchEvents(nextEvents);
     await Promise.all([
       db.saveSessions(nextSessions),
       db.saveAttendances(nextAttendances),
+      db.saveMatchEvents(nextEvents),
     ]);
     await pushSafe('deleteSession', async () => {
       await remote.deleteAttendancesForSession(id);
+      try {
+        await remote.deleteMatchEventsForSession(id);
+      } catch (err) {
+        warn('deleteMatchEventsForSession', err);
+      }
       await remote.deleteSession(id);
     });
-  }, [sessions, attendances]);
+  }, [sessions, attendances, matchEvents]);
 
   const toggleCancelled = useCallback(async (sessionId: string) => {
     const next = sessions.map((s) =>
@@ -350,6 +386,34 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return attendances.filter((a) => a.sessionId === sessionId);
   }, [attendances]);
 
+  const addMatchEvent = useCallback(async (sessionId: string, playerId: string, type: MatchEventType) => {
+    const event: MatchEvent = {
+      id: uid(),
+      sessionId,
+      playerId,
+      type,
+      createdAt: todayISO(),
+    };
+    const next = [...matchEvents, event];
+    setMatchEvents(next);
+    await db.saveMatchEvents(next);
+    await pushSafe('insertMatchEvent', () => remote.insertMatchEvent(event));
+    return event;
+  }, [matchEvents]);
+
+  const removeMatchEvent = useCallback(async (id: string) => {
+    const next = matchEvents.filter((e) => e.id !== id);
+    setMatchEvents(next);
+    await db.saveMatchEvents(next);
+    await pushSafe('deleteMatchEvent', () => remote.deleteMatchEvent(id));
+  }, [matchEvents]);
+
+  const getSessionEvents = useCallback((sessionId: string) => {
+    return matchEvents
+      .filter((e) => e.sessionId === sessionId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [matchEvents]);
+
   const activeTrainings = useMemo(
     () => sessions.filter((s) => isTraining(s) && !s.cancelled),
     [sessions],
@@ -365,6 +429,30 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const activeMatchIds = useMemo(
     () => new Set(activeMatches.map((s) => s.id)),
     [activeMatches],
+  );
+
+  const getPlayerMatchTotals = useCallback(
+    (playerId: string, sessionId?: string): PlayerMatchTotals => {
+      const totals: PlayerMatchTotals = {
+        goals: 0,
+        assists: 0,
+        key: 0,
+        yellow: 0,
+        red: 0,
+      };
+      for (const e of matchEvents) {
+        if (e.playerId !== playerId) continue;
+        if (sessionId && e.sessionId !== sessionId) continue;
+        if (!sessionId && !activeMatchIds.has(e.sessionId)) continue;
+        if (e.type === 'goal') totals.goals += 1;
+        else if (e.type === 'assist') totals.assists += 1;
+        else if (e.type === 'key') totals.key += 1;
+        else if (e.type === 'yellow') totals.yellow += 1;
+        else if (e.type === 'red') totals.red += 1;
+      }
+      return totals;
+    },
+    [matchEvents, activeMatchIds],
   );
 
   const playerStats = useMemo<PlayerStats[]>(() => {
@@ -455,6 +543,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setPlayers([]);
     setSessions([]);
     setAttendances([]);
+    setMatchEvents([]);
   }, []);
 
   const value: DataContextValue = {
@@ -462,6 +551,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     players,
     sessions,
     attendances,
+    matchEvents,
     addPlayer,
     removePlayer,
     renamePlayer,
@@ -473,6 +563,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     bulkSetAttendance,
     getStatus,
     getSessionAttendance,
+    addMatchEvent,
+    removeMatchEvent,
+    getSessionEvents,
+    getPlayerMatchTotals,
     playerStats,
     matchCallUps,
     globalRatio,

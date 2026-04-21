@@ -44,3 +44,28 @@ export type PlayerStats = {
   totalSessions: number;
   ratio: number;
 };
+
+export type MatchEventType =
+  | 'goal'
+  | 'assist'
+  | 'key'
+  | 'yellow'
+  | 'red';
+
+export type MatchEvent = {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  type: MatchEventType;
+  minute?: number;
+  note?: string;
+  createdAt: string;
+};
+
+export type PlayerMatchTotals = {
+  goals: number;
+  assists: number;
+  key: number;
+  yellow: number;
+  red: number;
+};

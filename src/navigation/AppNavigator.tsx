@@ -3,6 +3,7 @@ import { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DashboardScreen } from '@/screens/DashboardScreen';
+import { MatchLiveScreen } from '@/screens/MatchLiveScreen';
 import { SessionScreen } from '@/screens/SessionScreen';
 import { SessionsListScreen } from '@/screens/SessionsListScreen';
 import { PlayersScreen } from '@/screens/PlayersScreen';
@@ -20,6 +21,7 @@ export type RootStackParamList = {
   Tabs: NavigatorScreenParams<TabParamList>;
   Session: { sessionId: string };
   Sessions: undefined;
+  MatchLive: { sessionId: string };
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -95,6 +97,11 @@ export function AppNavigator() {
         name="Session"
         component={SessionScreen}
         options={{ title: 'Séance' }}
+      />
+      <Stack.Screen
+        name="MatchLive"
+        component={MatchLiveScreen}
+        options={{ title: 'Match Live' }}
       />
     </Stack.Navigator>
   );
