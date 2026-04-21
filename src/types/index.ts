@@ -13,6 +13,9 @@ export type Session = {
   label?: string;
   kind?: SessionKind;
   cancelled?: boolean;
+  startedAt?: string;
+  endedAt?: string;
+  startingLineup?: string[];
   createdAt: string;
 };
 
@@ -68,4 +71,15 @@ export type PlayerMatchTotals = {
   key: number;
   yellow: number;
   red: number;
+};
+
+export type PlayerPosition = 'GK' | 'DEF' | 'MID' | 'ATT';
+
+export type PlayerStint = {
+  id: string;
+  sessionId: string;
+  playerId: string;
+  position?: PlayerPosition;
+  startAt: string;
+  endAt?: string;
 };

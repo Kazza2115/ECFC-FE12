@@ -1,6 +1,5 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
-  FlatList,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,70 +10,185 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '@/components/Avatar';
 import { BottomSheet } from '@/components/BottomSheet';
+import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { EVENT_META, EVENT_ORDER } from '@/constants/events';
+import { POSITION_META, POSITION_ORDER } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
 import { confirm } from '@/utils/confirm';
-import type { MatchEventType, Player } from '@/types';
+import type { MatchEventType, Player, PlayerPosition } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MatchLive'>;
+
+function formatDuration(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+type EventSheetState = { player: Player } | null;
+type PositionSheetState = {
+  player: Player;
+  mode: 'lineup' | 'substitute';
+  onSelect: (pos: PlayerPosition | undefined) => void;
+} | null;
 
 export function MatchLiveScreen({ route, navigation }: Props) {
   const { sessionId } = route.params;
   const {
     players,
     sessions,
+    stints,
     getStatus,
     addMatchEvent,
     removeMatchEvent,
     getSessionEvents,
     getPlayerMatchTotals,
+    getSessionStints,
+    getPlayerPlayMs,
+    toggleLineup,
+    startMatch,
+    endMatch,
+    putOnPitch,
+    takeOffPitch,
   } = useData();
 
   const session = sessions.find((s) => s.id === sessionId);
-  const [sheetPlayer, setSheetPlayer] = useState<Player | null>(null);
+  const [now, setNow] = useState<number>(Date.now());
+  const [eventSheet, setEventSheet] = useState<EventSheetState>(null);
+  const [positionSheet, setPositionSheet] = useState<PositionSheetState>(null);
 
-  const events = useMemo(() => getSessionEvents(sessionId), [getSessionEvents, sessionId]);
+  const started = !!session?.startedAt;
+  const ended = !!session?.endedAt;
+  const matchRunning = started && !ended;
+
+  useEffect(() => {
+    if (!matchRunning) return;
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [matchRunning]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: session
+        ? `Live · ${session.label ? `vs ${session.label} · ` : ''}${formatDate(session.date)}`
+        : 'Match Live',
+    });
+  }, [navigation, session]);
 
   const convoqués = useMemo(() => {
     const eligible = players.filter((p) => {
       const status = getStatus(sessionId, p.id);
       return status === 'present' || status === 'sfc' || status === 'return';
     });
-    const withEventIds = new Set(events.map((e) => e.playerId));
+    const extraIds = new Set<string>();
+    for (const st of stints) {
+      if (st.sessionId === sessionId) extraIds.add(st.playerId);
+    }
+    for (const e of getSessionEvents(sessionId)) {
+      extraIds.add(e.playerId);
+    }
     const extras = players.filter(
-      (p) => withEventIds.has(p.id) && !eligible.find((e) => e.id === p.id),
+      (p) => extraIds.has(p.id) && !eligible.find((x) => x.id === p.id),
     );
     return [...eligible, ...extras];
-  }, [players, getStatus, sessionId, events]);
+  }, [players, getStatus, sessionId, stints, getSessionEvents]);
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: session ? `Live · ${formatDate(session.date)}` : 'Match Live',
-    });
-  }, [navigation, session]);
+  const sessionStints = useMemo(
+    () => getSessionStints(sessionId),
+    [getSessionStints, sessionId],
+  );
 
-  const record = async (playerId: string, type: MatchEventType) => {
-    try {
-      await Haptics.notificationAsync(
-        type === 'goal'
-          ? Haptics.NotificationFeedbackType.Success
-          : type === 'red'
-          ? Haptics.NotificationFeedbackType.Error
-          : Haptics.NotificationFeedbackType.Warning,
-      );
-    } catch {}
-    await addMatchEvent(sessionId, playerId, type);
+  const onPitchIds = useMemo(() => {
+    if (!started) return new Set(session?.startingLineup ?? []);
+    return new Set(
+      sessionStints.filter((st) => !st.endAt).map((st) => st.playerId),
+    );
+  }, [started, session, sessionStints]);
+
+  const currentPosition = (playerId: string): PlayerPosition | undefined => {
+    const open = sessionStints
+      .filter((st) => st.playerId === playerId && !st.endAt)
+      .sort(
+        (a, b) =>
+          new Date(b.startAt).getTime() - new Date(a.startAt).getTime(),
+      )[0];
+    return open?.position;
   };
 
-  const undo = async (id: string) => {
+  const handleTogglePitch = async (player: Player) => {
+    const onPitch = onPitchIds.has(player.id);
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    if (onPitch) {
+      await takeOffPitch(sessionId, player.id);
+      return;
+    }
+    if (!started) {
+      await toggleLineup(sessionId, player.id);
+      return;
+    }
+    setPositionSheet({
+      player,
+      mode: 'substitute',
+      onSelect: async (pos) => {
+        setPositionSheet(null);
+        await putOnPitch(sessionId, player.id, pos);
+      },
+    });
+  };
+
+  const handleStartMatch = async () => {
+    const lineup = session?.startingLineup ?? [];
+    if (lineup.length === 0) {
+      const ok = await confirm({
+        title: 'Aucun titulaire désigné',
+        message: 'Tu peux démarrer sans titulaires mais le temps ne comptera que quand tu mets un joueur sur le terrain.',
+        confirmLabel: 'Démarrer',
+      });
+      if (!ok) return;
+    }
+    try {
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
+    } catch {}
+    await startMatch(sessionId);
+  };
+
+  const handleEndMatch = async () => {
     const ok = await confirm({
-      title: 'Annuler cet évènement ?',
+      title: 'Finir le match ?',
+      message: 'Ferme tous les temps de jeu en cours.',
+      confirmLabel: 'Finir le match',
+    });
+    if (!ok) return;
+    try {
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
+    } catch {}
+    await endMatch(sessionId);
+  };
+
+  const handleAddEvent = async (player: Player, type: MatchEventType) => {
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await addMatchEvent(sessionId, player.id, type);
+    setEventSheet(null);
+  };
+
+  const handleRemoveEvent = async (id: string) => {
+    const ok = await confirm({
+      title: 'Supprimer cet évènement ?',
       confirmLabel: 'Supprimer',
       destructive: true,
     });
@@ -82,158 +196,171 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     await removeMatchEvent(id);
   };
 
+  const recentEvents = useMemo(
+    () => [...getSessionEvents(sessionId)].reverse().slice(0, 20),
+    [getSessionEvents, sessionId],
+  );
+
+  const matchClock = useMemo(() => {
+    if (!session?.startedAt) return null;
+    const base = new Date(session.startedAt).getTime();
+    const end = session.endedAt ? new Date(session.endedAt).getTime() : now;
+    return formatDuration(end - base);
+  }, [session, now]);
+
   if (!session) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.muted}>Match introuvable.</Text>
+          <Text style={styles.muted}>Session introuvable.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const pitchPlayers = convoqués.filter((p) => onPitchIds.has(p.id));
+  const benchPlayers = convoqués.filter((p) => !onPitchIds.has(p.id));
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.meta}>
-          <Text style={styles.opponent}>
-            {session.label ? `vs ${session.label}` : 'Match en cours'}
-          </Text>
-          <Text style={styles.hint}>
-            {convoqués.length} convoqué{convoqués.length > 1 ? 's' : ''} · appuie sur un joueur pour enregistrer un évènement
-          </Text>
-        </View>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Card style={styles.clockCard}>
+          <View style={styles.clockRow}>
+            <View>
+              <Text style={styles.clockLabel}>
+                {ended ? 'Match terminé' : started ? 'Match en cours' : 'Match à démarrer'}
+              </Text>
+              <Text style={styles.clockValue}>{matchClock ?? '0:00'}</Text>
+              <Text style={styles.clockHint}>
+                {convoqués.length} convoqués · {pitchPlayers.length} sur le terrain
+              </Text>
+            </View>
+            <View style={styles.clockActions}>
+              {!started ? (
+                <Button label="▶ Démarrer" onPress={handleStartMatch} />
+              ) : !ended ? (
+                <Button label="Finir" variant="secondary" onPress={handleEndMatch} />
+              ) : null}
+            </View>
+          </View>
+        </Card>
 
         {convoqués.length === 0 ? (
           <Card>
             <EmptyState
-              title="Aucun convoqué"
-              description={'Retourne à la convocation et marque les joueurs [✓ Convoqué] avant de démarrer le mode live.'}
+              title="Aucun joueur convoqué"
+              description="Retourne sur la convocation du match pour convoquer des joueurs."
             />
           </Card>
         ) : (
-          <View style={styles.grid}>
-            {convoqués.map((p) => {
-              const totals = getPlayerMatchTotals(p.id, sessionId);
-              const rawPills: Array<{ key: MatchEventType; value: number }> = [
-                { key: 'goal', value: totals.goals },
-                { key: 'assist', value: totals.assists },
-                { key: 'key', value: totals.key },
-                { key: 'yellow', value: totals.yellow },
-                { key: 'red', value: totals.red },
-              ];
-              const pills = rawPills.filter((x) => x.value > 0);
-
-              return (
-                <Pressable
-                  key={p.id}
-                  style={styles.playerCard}
-                  onPress={() => setSheetPlayer(p)}
-                >
-                  <Avatar name={p.name} photoUri={p.photoUri} size={52} />
-                  <Text style={styles.playerName} numberOfLines={1}>
-                    {p.name}
-                  </Text>
-                  <View style={styles.pillsRow}>
-                    {pills.length === 0 ? (
-                      <Text style={styles.pillMuted}>Toucher</Text>
-                    ) : (
-                      pills.map((pill) => {
-                        const meta = EVENT_META[pill.key];
-                        return (
-                          <View
-                            key={pill.key}
-                            style={[styles.pill, { backgroundColor: meta.bg }]}
-                          >
-                            <Text style={[styles.pillValue, { color: meta.color }]}>
-                              {meta.glyph}
-                              {pill.value}
-                            </Text>
-                          </View>
-                        );
-                      })
-                    )}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Évènements ({events.length})</Text>
-        {events.length === 0 ? (
-          <Card>
-            <Text style={styles.emptyTimeline}>
-              Pas encore d'action. Les évènements apparaîtront ici dès que tu en
-              enregistres un.
+          <>
+            <Text style={styles.sectionHeader}>
+              {started ? 'Sur le terrain' : 'Titulaires'} ({pitchPlayers.length})
             </Text>
-          </Card>
-        ) : (
-          <Card padded={false} style={styles.timelineCard}>
-            <FlatList
-              data={events}
-              scrollEnabled={false}
-              keyExtractor={(e) => e.id}
-              ItemSeparatorComponent={() => <View style={styles.timelineDivider} />}
-              renderItem={({ item }) => {
-                const meta = EVENT_META[item.type];
-                const player = players.find((p) => p.id === item.playerId);
-                const when = new Date(item.createdAt);
-                const time = `${when.getHours().toString().padStart(2, '0')}:${when
-                  .getMinutes()
-                  .toString()
-                  .padStart(2, '0')}`;
-                return (
-                  <View style={styles.timelineRow}>
-                    <View style={[styles.timelineGlyph, { backgroundColor: meta.bg }]}>
-                      <Text style={[styles.timelineGlyphText, { color: meta.color }]}>
-                        {meta.glyph}
-                      </Text>
-                    </View>
-                    <View style={styles.timelineBody}>
-                      <Text style={styles.timelineTitle} numberOfLines={1}>
-                        {player?.name ?? 'Joueur supprimé'}
-                      </Text>
-                      <Text style={styles.timelineMeta}>
-                        {meta.label} · {time}
-                      </Text>
-                    </View>
-                    <Pressable style={styles.undoBtn} onPress={() => undo(item.id)}>
-                      <Text style={styles.undoLabel}>Annuler</Text>
-                    </Pressable>
-                  </View>
-                );
-              }}
-            />
-          </Card>
+            {pitchPlayers.length === 0 ? (
+              <Card>
+                <Text style={styles.muted}>
+                  {started
+                    ? 'Personne sur le terrain. Appuie sur un joueur du banc pour l\'envoyer jouer.'
+                    : 'Marque tes titulaires en appuyant sur les joueurs du banc.'}
+                </Text>
+              </Card>
+            ) : (
+              pitchPlayers.map((player) => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  onPitch
+                  started={started}
+                  ended={ended}
+                  playMs={getPlayerPlayMs(player.id, sessionId, now)}
+                  totals={getPlayerMatchTotals(player.id, sessionId)}
+                  position={currentPosition(player.id)}
+                  onTogglePitch={() => handleTogglePitch(player)}
+                  onEvent={() => setEventSheet({ player })}
+                />
+              ))
+            )}
+
+            <Text style={styles.sectionHeader}>
+              Banc ({benchPlayers.length})
+            </Text>
+            {benchPlayers.length === 0 ? (
+              <Card>
+                <Text style={styles.muted}>Tous les convoqués sont sur le terrain.</Text>
+              </Card>
+            ) : (
+              benchPlayers.map((player) => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  onPitch={false}
+                  started={started}
+                  ended={ended}
+                  playMs={getPlayerPlayMs(player.id, sessionId, now)}
+                  totals={getPlayerMatchTotals(player.id, sessionId)}
+                  position={undefined}
+                  onTogglePitch={() => handleTogglePitch(player)}
+                  onEvent={() => setEventSheet({ player })}
+                />
+              ))
+            )}
+          </>
         )}
 
-        <View style={{ height: spacing.xl }} />
+        {recentEvents.length > 0 ? (
+          <>
+            <Text style={styles.sectionHeader}>Évènements récents</Text>
+            <Card padded={false}>
+              {recentEvents.map((ev, idx) => {
+                const meta = EVENT_META[ev.type];
+                const player = players.find((p) => p.id === ev.playerId);
+                return (
+                  <Pressable
+                    key={ev.id}
+                    onLongPress={() => handleRemoveEvent(ev.id)}
+                    style={[
+                      styles.eventRow,
+                      idx < recentEvents.length - 1 && styles.eventDivider,
+                    ]}
+                  >
+                    <Text style={[styles.eventGlyph, { color: meta.color }]}>
+                      {meta.glyph}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.eventName}>
+                        {player ? player.name : '—'}
+                      </Text>
+                      <Text style={styles.eventMeta}>
+                        {meta.label} · appui long pour supprimer
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Card>
+          </>
+        ) : null}
       </ScrollView>
 
       <BottomSheet
-        visible={!!sheetPlayer}
-        title={sheetPlayer ? sheetPlayer.name : 'Évènement'}
-        onClose={() => setSheetPlayer(null)}
+        visible={!!eventSheet}
+        title={eventSheet ? eventSheet.player.name : ''}
+        onClose={() => setEventSheet(null)}
       >
-        <View style={styles.sheetGrid}>
+        <View style={styles.eventGrid}>
           {EVENT_ORDER.map((type) => {
             const meta = EVENT_META[type];
             return (
               <Pressable
                 key={type}
-                style={[
-                  styles.sheetItem,
-                  { backgroundColor: meta.bg, borderColor: meta.color + '55' },
-                ]}
-                onPress={async () => {
-                  if (!sheetPlayer) return;
-                  await record(sheetPlayer.id, type);
-                  setSheetPlayer(null);
-                }}
+                onPress={() =>
+                  eventSheet && handleAddEvent(eventSheet.player, type)
+                }
+                style={[styles.eventOption, { backgroundColor: meta.bg }]}
               >
-                <Text style={styles.sheetGlyph}>{meta.glyph}</Text>
-                <Text style={[styles.sheetLabel, { color: meta.color }]}>
+                <Text style={styles.eventOptionGlyph}>{meta.glyph}</Text>
+                <Text style={[styles.eventOptionLabel, { color: meta.color }]}>
                   {meta.label}
                 </Text>
               </Pressable>
@@ -241,7 +368,173 @@ export function MatchLiveScreen({ route, navigation }: Props) {
           })}
         </View>
       </BottomSheet>
+
+      <BottomSheet
+        visible={!!positionSheet}
+        title={
+          positionSheet
+            ? `${positionSheet.player.name} · poste ?`
+            : 'Poste ?'
+        }
+        onClose={() => setPositionSheet(null)}
+      >
+        <View style={styles.positionsRow}>
+          {POSITION_ORDER.map((pos) => {
+            const meta = POSITION_META[pos];
+            return (
+              <Pressable
+                key={pos}
+                onPress={() => positionSheet?.onSelect(pos)}
+                style={[styles.positionChip, { backgroundColor: meta.bg }]}
+              >
+                <Text style={[styles.positionLabel, { color: meta.color }]}>
+                  {meta.short}
+                </Text>
+                <Text style={[styles.positionSub, { color: meta.color }]}>
+                  {meta.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Pressable
+          onPress={() => positionSheet?.onSelect(undefined)}
+          style={styles.positionSkip}
+        >
+          <Text style={styles.positionSkipLabel}>Sans poste</Text>
+        </Pressable>
+      </BottomSheet>
     </SafeAreaView>
+  );
+}
+
+function PlayerCard({
+  player,
+  onPitch,
+  started,
+  ended,
+  playMs,
+  totals,
+  position,
+  onTogglePitch,
+  onEvent,
+}: {
+  player: Player;
+  onPitch: boolean;
+  started: boolean;
+  ended: boolean;
+  playMs: number;
+  totals: { goals: number; assists: number; key: number; yellow: number; red: number };
+  position: PlayerPosition | undefined;
+  onTogglePitch: () => void;
+  onEvent: () => void;
+}) {
+  const hasEvents =
+    totals.goals + totals.assists + totals.key + totals.yellow + totals.red > 0;
+
+  return (
+    <Card style={[styles.playerCard, onPitch && styles.playerCardActive]}>
+      <View style={styles.playerTop}>
+        <Avatar name={player.name} photoUri={player.photoUri} size={44} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.playerNameRow}>
+            <Text style={styles.playerName} numberOfLines={1}>
+              {player.name}
+            </Text>
+            {position ? (
+              <View
+                style={[
+                  styles.positionBadge,
+                  { backgroundColor: POSITION_META[position].bg },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.positionBadgeLabel,
+                    { color: POSITION_META[position].color },
+                  ]}
+                >
+                  {POSITION_META[position].short}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={styles.playerMeta}>
+            {started
+              ? `${formatDuration(playMs)} joué${onPitch && !ended ? ' · en cours' : ''}`
+              : onPitch
+              ? 'Titulaire'
+              : 'Sur le banc'}
+          </Text>
+        </View>
+        <Pressable
+          disabled={ended}
+          onPress={onTogglePitch}
+          style={[
+            styles.pitchToggle,
+            onPitch ? styles.pitchToggleOn : styles.pitchToggleOff,
+            ended && styles.pitchToggleDisabled,
+          ]}
+        >
+          <Text
+            style={[
+              styles.pitchToggleLabel,
+              onPitch ? styles.pitchToggleLabelOn : styles.pitchToggleLabelOff,
+            ]}
+          >
+            {onPitch
+              ? started
+                ? 'Banc'
+                : 'Titulaire'
+              : started
+              ? 'Terrain'
+              : 'Titulaire'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.playerBottom}>
+        <Pressable onPress={onEvent} style={styles.eventBtn}>
+          <Text style={styles.eventBtnLabel}>⚡ Évènement</Text>
+        </Pressable>
+        {hasEvents ? (
+          <View style={styles.totalsRow}>
+            {totals.goals > 0 ? (
+              <TotalPill color={EVENT_META.goal.color} glyph={EVENT_META.goal.glyph} value={totals.goals} />
+            ) : null}
+            {totals.assists > 0 ? (
+              <TotalPill color={EVENT_META.assist.color} glyph={EVENT_META.assist.glyph} value={totals.assists} />
+            ) : null}
+            {totals.key > 0 ? (
+              <TotalPill color={EVENT_META.key.color} glyph={EVENT_META.key.glyph} value={totals.key} />
+            ) : null}
+            {totals.yellow > 0 ? (
+              <TotalPill color={EVENT_META.yellow.color} glyph={EVENT_META.yellow.glyph} value={totals.yellow} />
+            ) : null}
+            {totals.red > 0 ? (
+              <TotalPill color={EVENT_META.red.color} glyph={EVENT_META.red.glyph} value={totals.red} />
+            ) : null}
+          </View>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function TotalPill({
+  color,
+  glyph,
+  value,
+}: {
+  color: string;
+  glyph: string;
+  value: number;
+}) {
+  return (
+    <View style={[styles.totalPill, { borderColor: color + '44' }]}>
+      <Text style={styles.totalGlyph}>{glyph}</Text>
+      <Text style={[styles.totalValue, { color }]}>{value}</Text>
+    </View>
   );
 }
 
@@ -249,93 +542,171 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { ...typography.body, color: colors.textMuted },
-  content: { padding: spacing.lg, gap: spacing.md },
-  meta: { gap: 4 },
-  opponent: { ...typography.h2, color: colors.textPrimary },
-  hint: { ...typography.body, color: colors.textSecondary },
-  grid: {
+  scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
+  clockCard: {},
+  clockRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  playerCard: {
-    width: '48%',
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
     alignItems: 'center',
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-  playerName: {
-    ...typography.bodyBold,
+  clockLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  clockValue: {
+    ...typography.number,
+    fontSize: 32,
     color: colors.textPrimary,
-    textAlign: 'center',
-    fontSize: 14,
+    marginTop: 2,
   },
-  pillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 4,
-    minHeight: 24,
-    alignItems: 'center',
-  },
-  pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-  },
-  pillValue: { fontSize: 12, fontWeight: '700' },
-  pillMuted: { ...typography.caption, color: colors.textMuted },
-  sectionTitle: {
+  clockHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  clockActions: { flexDirection: 'row', gap: spacing.sm },
+  sectionHeader: {
     ...typography.h3,
     color: colors.textPrimary,
     marginTop: spacing.md,
   },
-  timelineCard: {},
-  timelineRow: {
+  playerCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.border,
+    gap: spacing.sm,
+  },
+  playerCardActive: {
+    borderLeftColor: colors.primary,
+    backgroundColor: colors.surface,
+  },
+  playerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
     gap: spacing.md,
   },
-  timelineDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-  },
-  timelineGlyph: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  playerNameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  timelineGlyphText: { fontSize: 18 },
-  timelineBody: { flex: 1, minWidth: 0 },
-  timelineTitle: { ...typography.bodyBold, color: colors.textPrimary },
-  timelineMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  undoBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  playerName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  positionBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.accentSoft,
   },
-  undoLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: '700' },
-  emptyTimeline: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
-  sheetGrid: { gap: spacing.sm },
-  sheetItem: {
+  positionBadgeLabel: {
+    ...typography.caption,
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  playerMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  pitchToggle: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+  },
+  pitchToggleOn: { backgroundColor: colors.primary },
+  pitchToggleOff: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pitchToggleDisabled: { opacity: 0.4 },
+  pitchToggleLabel: {
+    ...typography.bodyBold,
+    fontSize: 13,
+  },
+  pitchToggleLabelOn: { color: '#FFFFFF' },
+  pitchToggleLabelOff: { color: colors.textPrimary },
+  playerBottom: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  eventBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  eventBtnLabel: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  totalsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  totalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
     borderWidth: 1,
   },
-  sheetGlyph: { fontSize: 22 },
-  sheetLabel: { ...typography.bodyBold, fontSize: 16 },
+  totalGlyph: { fontSize: 13 },
+  totalValue: { fontSize: 13, fontWeight: '800' },
+  eventRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  eventDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  eventGlyph: { fontSize: 22 },
+  eventName: { ...typography.bodyBold, color: colors.textPrimary },
+  eventMeta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  eventGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  eventOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    width: '48%',
+    flexGrow: 1,
+  },
+  eventOptionGlyph: { fontSize: 20 },
+  eventOptionLabel: {
+    ...typography.bodyBold,
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  positionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  positionChip: {
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+  },
+  positionLabel: { ...typography.h2, fontSize: 20 },
+  positionSub: { ...typography.caption, marginTop: 2, fontWeight: '700' },
+  positionSkip: {
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  positionSkipLabel: {
+    ...typography.bodyBold,
+    color: colors.textSecondary,
+  },
 });

@@ -36,6 +36,7 @@ export function StatsScreen() {
     playerStats,
     matchCallUps,
     getPlayerMatchTotals,
+    getPlayerPlayMs,
     globalRatio,
     activeTrainingsCount,
     activeMatchesCount,
@@ -143,6 +144,7 @@ export function StatsScreen() {
             matchEvents={matchEvents}
             activeMatchesCount={activeMatchesCount}
             getPlayerMatchTotals={getPlayerMatchTotals}
+            getPlayerPlayMs={getPlayerPlayMs}
           />
         ) : (
           <Card>
@@ -310,18 +312,28 @@ function TrainingView({
   );
 }
 
+function formatMinutes(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}min${s > 0 ? ` ${s.toString().padStart(2, '0')}s` : ''}`;
+}
+
 function MatchView({
   players,
   matchCallUps,
   matchEvents,
   activeMatchesCount,
   getPlayerMatchTotals,
+  getPlayerPlayMs,
 }: {
   players: ReturnType<typeof useData>['players'];
   matchCallUps: ReturnType<typeof useData>['matchCallUps'];
   matchEvents: ReturnType<typeof useData>['matchEvents'];
   activeMatchesCount: number;
   getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
+  getPlayerPlayMs: (playerId: string, sessionId?: string, now?: number) => number;
 }) {
   const playerTotals = useMemo(() => {
     return players
@@ -355,6 +367,21 @@ function MatchView({
     (a, b) => b.totals.assists - a.totals.assists,
   )[0];
   const hasAssister = topAssister && topAssister.totals.assists > 0;
+
+  const playMinutesByPlayer = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of players) {
+      map.set(p.id, getPlayerPlayMs(p.id));
+    }
+    return map;
+  }, [players, getPlayerPlayMs]);
+
+  const topMinutes = useMemo(() => {
+    return [...players]
+      .map((p) => ({ player: p, ms: playMinutesByPlayer.get(p.id) ?? 0 }))
+      .filter((x) => x.ms > 0)
+      .sort((a, b) => b.ms - a.ms)[0];
+  }, [players, playMinutesByPlayer]);
 
   return (
     <>
@@ -399,6 +426,17 @@ function MatchView({
               >
                 {topAssister!.totals.assists} passe
                 {topAssister!.totals.assists > 1 ? 's' : ''}
+              </Text>
+            </View>
+          ) : null}
+          {topMinutes ? (
+            <View style={styles.leaderCard}>
+              <Text style={styles.leaderLabel}>⏱  Plus gros temps de jeu</Text>
+              <Text style={styles.leaderValue} numberOfLines={1}>
+                {topMinutes.player.name}
+              </Text>
+              <Text style={[styles.leaderCount, { color: colors.primary }]}>
+                {formatMinutes(topMinutes.ms)}
               </Text>
             </View>
           ) : null}
@@ -463,6 +501,9 @@ function MatchView({
                 <View style={styles.barWrap}>
                   <ProgressBar value={stat.ratio} height={6} />
                 </View>
+                <Text style={styles.playerMeta}>
+                  ⏱ {formatMinutes(playMinutesByPlayer.get(stat.player.id) ?? 0)} joué
+                </Text>
                 <View style={styles.miniStats}>
                   <MiniStat
                     label="Conv"

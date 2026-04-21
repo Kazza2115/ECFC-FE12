@@ -14,7 +14,9 @@ import type {
   MatchEventType,
   Player,
   PlayerMatchTotals,
+  PlayerPosition,
   PlayerStats,
+  PlayerStint,
   Session,
   SessionKind,
 } from '@/types';
@@ -36,6 +38,7 @@ type DataContextValue = {
   sessions: Session[];
   attendances: Attendance[];
   matchEvents: MatchEvent[];
+  stints: PlayerStint[];
   addPlayer: (name: string) => Promise<Player>;
   removePlayer: (id: string) => Promise<void>;
   renamePlayer: (id: string, name: string) => Promise<void>;
@@ -51,6 +54,15 @@ type DataContextValue = {
   removeMatchEvent: (id: string) => Promise<void>;
   getSessionEvents: (sessionId: string) => MatchEvent[];
   getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
+  setStartingLineup: (sessionId: string, playerIds: string[]) => Promise<void>;
+  toggleLineup: (sessionId: string, playerId: string) => Promise<void>;
+  startMatch: (sessionId: string) => Promise<void>;
+  endMatch: (sessionId: string) => Promise<void>;
+  putOnPitch: (sessionId: string, playerId: string, position?: PlayerPosition) => Promise<void>;
+  takeOffPitch: (sessionId: string, playerId: string) => Promise<void>;
+  setStintPosition: (stintId: string, position: PlayerPosition) => Promise<void>;
+  getSessionStints: (sessionId: string) => PlayerStint[];
+  getPlayerPlayMs: (playerId: string, sessionId?: string, now?: number) => number;
   playerStats: PlayerStats[];
   matchCallUps: MatchCallUp[];
   globalRatio: number;
@@ -78,6 +90,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
+  const [stints, setStints] = useState<PlayerStint[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
@@ -99,12 +112,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         cachedSessions,
         cachedAttendances,
         cachedEvents,
+        cachedStints,
         seeded,
       ] = await Promise.all([
         db.getPlayers(),
         db.getSessions(),
         db.getAttendances(),
         db.getMatchEvents(),
+        db.getStints(),
         db.wasSeeded(),
       ]);
 
@@ -112,6 +127,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setSessions(cachedSessions);
       setAttendances(migrateAttendances(cachedAttendances));
       setMatchEvents(cachedEvents);
+      setStints(cachedStints);
       setLoading(false);
 
       setSyncStatus('syncing');
@@ -127,11 +143,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           );
           setAttendances(snap.attendances);
           setMatchEvents(snap.matchEvents);
+          setStints(snap.stints);
           await Promise.all([
             db.savePlayers(snap.players),
             db.saveSessions(snap.sessions),
             db.saveAttendances(snap.attendances),
             db.saveMatchEvents(snap.matchEvents),
+            db.saveStints(snap.stints),
             db.markSeeded(),
           ]);
         } else if (cachedPlayers.length === 0 && !seeded) {
@@ -182,11 +200,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       );
       setAttendances(snap.attendances);
       setMatchEvents(snap.matchEvents);
+      setStints(snap.stints);
       await Promise.all([
         db.savePlayers(snap.players),
         db.saveSessions(snap.sessions),
         db.saveAttendances(snap.attendances),
         db.saveMatchEvents(snap.matchEvents),
+        db.saveStints(snap.stints),
       ]);
       markSynced();
     } catch (err) {
@@ -226,13 +246,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const nextPlayers = players.filter((p) => p.id !== id);
     const nextAttendances = attendances.filter((a) => a.playerId !== id);
     const nextEvents = matchEvents.filter((e) => e.playerId !== id);
+    const nextStints = stints.filter((s) => s.playerId !== id);
     setPlayers(nextPlayers);
     setAttendances(nextAttendances);
     setMatchEvents(nextEvents);
+    setStints(nextStints);
     await Promise.all([
       db.savePlayers(nextPlayers),
       db.saveAttendances(nextAttendances),
       db.saveMatchEvents(nextEvents),
+      db.saveStints(nextStints),
     ]);
     await pushSafe('deletePlayer', async () => {
       await remote.deleteAttendancesForPlayer(id);
@@ -241,12 +264,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         warn('deleteMatchEventsForPlayer', err);
       }
+      try {
+        await remote.deleteStintsForPlayer(id);
+      } catch (err) {
+        warn('deleteStintsForPlayer', err);
+      }
       await remote.deletePlayer(id);
       try {
         await remote.deletePhoto(id);
       } catch {}
     });
-  }, [players, attendances, matchEvents]);
+  }, [players, attendances, matchEvents, stints]);
 
   const renamePlayer = useCallback(async (id: string, name: string) => {
     const next = players.map((p) =>
@@ -312,13 +340,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const nextSessions = sessions.filter((s) => s.id !== id);
     const nextAttendances = attendances.filter((a) => a.sessionId !== id);
     const nextEvents = matchEvents.filter((e) => e.sessionId !== id);
+    const nextStints = stints.filter((st) => st.sessionId !== id);
     setSessions(nextSessions);
     setAttendances(nextAttendances);
     setMatchEvents(nextEvents);
+    setStints(nextStints);
     await Promise.all([
       db.saveSessions(nextSessions),
       db.saveAttendances(nextAttendances),
       db.saveMatchEvents(nextEvents),
+      db.saveStints(nextStints),
     ]);
     await pushSafe('deleteSession', async () => {
       await remote.deleteAttendancesForSession(id);
@@ -327,9 +358,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         warn('deleteMatchEventsForSession', err);
       }
+      try {
+        await remote.deleteStintsForSession(id);
+      } catch (err) {
+        warn('deleteStintsForSession', err);
+      }
       await remote.deleteSession(id);
     });
-  }, [sessions, attendances, matchEvents]);
+  }, [sessions, attendances, matchEvents, stints]);
 
   const toggleCancelled = useCallback(async (sessionId: string) => {
     const next = sessions.map((s) =>
@@ -455,6 +491,204 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [matchEvents, activeMatchIds],
   );
 
+  // --- Lineup & stints ---
+
+  const setStartingLineup = useCallback(
+    async (sessionId: string, playerIds: string[]) => {
+      const next = sessions.map((s) =>
+        s.id === sessionId ? { ...s, startingLineup: playerIds } : s,
+      );
+      setSessions(next);
+      await db.saveSessions(next);
+      const changed = next.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('setStartingLineup', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
+
+  const toggleLineup = useCallback(
+    async (sessionId: string, playerId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      const current = session?.startingLineup ?? [];
+      const nextLineup = current.includes(playerId)
+        ? current.filter((id) => id !== playerId)
+        : [...current, playerId];
+      await setStartingLineup(sessionId, nextLineup);
+    },
+    [sessions, setStartingLineup],
+  );
+
+  const startMatch = useCallback(
+    async (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const startedAt = todayISO();
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? { ...s, startedAt, endedAt: undefined }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+
+      const lineupIds = session.startingLineup ?? [];
+      const newStints: PlayerStint[] = lineupIds.map((playerId) => ({
+        id: uid(),
+        sessionId,
+        playerId,
+        startAt: startedAt,
+      }));
+      if (newStints.length > 0) {
+        const nextStints = [...stints, ...newStints];
+        setStints(nextStints);
+        await db.saveStints(nextStints);
+      }
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('startMatch', async () => {
+        if (changed) await remote.upsertSession(changed);
+        if (newStints.length > 0) await remote.upsertStints(newStints);
+      });
+    },
+    [sessions, stints],
+  );
+
+  const endMatch = useCallback(
+    async (sessionId: string) => {
+      const endedAt = todayISO();
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, endedAt } : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+
+      const openStints = stints.filter(
+        (st) => st.sessionId === sessionId && !st.endAt,
+      );
+      const closedStints = openStints.map((st) => ({ ...st, endAt: endedAt }));
+      const stintMap = new Map(closedStints.map((s) => [s.id, s]));
+      const nextStints = stints.map((st) => stintMap.get(st.id) ?? st);
+      setStints(nextStints);
+      await db.saveStints(nextStints);
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('endMatch', async () => {
+        if (changed) await remote.upsertSession(changed);
+        if (closedStints.length > 0) await remote.upsertStints(closedStints);
+      });
+    },
+    [sessions, stints],
+  );
+
+  const putOnPitch = useCallback(
+    async (sessionId: string, playerId: string, position?: PlayerPosition) => {
+      // If there's already an open stint, no-op
+      if (
+        stints.some(
+          (st) =>
+            st.sessionId === sessionId &&
+            st.playerId === playerId &&
+            !st.endAt,
+        )
+      ) {
+        return;
+      }
+      const session = sessions.find((s) => s.id === sessionId);
+      // Before match start, only update the lineup
+      if (session && !session.startedAt) {
+        if (!(session.startingLineup ?? []).includes(playerId)) {
+          await toggleLineup(sessionId, playerId);
+        }
+        return;
+      }
+      const st: PlayerStint = {
+        id: uid(),
+        sessionId,
+        playerId,
+        position,
+        startAt: todayISO(),
+      };
+      const next = [...stints, st];
+      setStints(next);
+      await db.saveStints(next);
+      await pushSafe('upsertStint', () => remote.upsertStint(st));
+    },
+    [stints, sessions, toggleLineup],
+  );
+
+  const takeOffPitch = useCallback(
+    async (sessionId: string, playerId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      // Before match start, just remove from lineup
+      if (session && !session.startedAt) {
+        if ((session.startingLineup ?? []).includes(playerId)) {
+          await toggleLineup(sessionId, playerId);
+        }
+        return;
+      }
+      const endAt = todayISO();
+      const openStints = stints.filter(
+        (st) =>
+          st.sessionId === sessionId &&
+          st.playerId === playerId &&
+          !st.endAt,
+      );
+      if (openStints.length === 0) return;
+      const closed = openStints.map((st) => ({ ...st, endAt }));
+      const map = new Map(closed.map((s) => [s.id, s]));
+      const next = stints.map((st) => map.get(st.id) ?? st);
+      setStints(next);
+      await db.saveStints(next);
+      await pushSafe('closeStint', () => remote.upsertStints(closed));
+    },
+    [stints, sessions, toggleLineup],
+  );
+
+  const setStintPosition = useCallback(
+    async (stintId: string, position: PlayerPosition) => {
+      const target = stints.find((st) => st.id === stintId);
+      if (!target) return;
+      const updated = { ...target, position };
+      const next = stints.map((st) => (st.id === stintId ? updated : st));
+      setStints(next);
+      await db.saveStints(next);
+      await pushSafe('setStintPosition', () =>
+        remote.upsertStint(updated),
+      );
+    },
+    [stints],
+  );
+
+  const getSessionStints = useCallback(
+    (sessionId: string) => {
+      return stints
+        .filter((st) => st.sessionId === sessionId)
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+    },
+    [stints],
+  );
+
+  const getPlayerPlayMs = useCallback(
+    (playerId: string, sessionId?: string, nowMs?: number): number => {
+      const reference = nowMs ?? Date.now();
+      let total = 0;
+      for (const st of stints) {
+        if (st.playerId !== playerId) continue;
+        if (sessionId && st.sessionId !== sessionId) continue;
+        if (!sessionId && !activeMatchIds.has(st.sessionId)) continue;
+        const start = new Date(st.startAt).getTime();
+        const end = st.endAt ? new Date(st.endAt).getTime() : reference;
+        if (end > start) total += end - start;
+      }
+      return total;
+    },
+    [stints, activeMatchIds],
+  );
+
   const playerStats = useMemo<PlayerStats[]>(() => {
     const totalSessions = activeTrainings.length;
     return players
@@ -544,6 +778,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setSessions([]);
     setAttendances([]);
     setMatchEvents([]);
+    setStints([]);
   }, []);
 
   const value: DataContextValue = {
@@ -552,6 +787,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     sessions,
     attendances,
     matchEvents,
+    stints,
     addPlayer,
     removePlayer,
     renamePlayer,
@@ -567,6 +803,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     removeMatchEvent,
     getSessionEvents,
     getPlayerMatchTotals,
+    setStartingLineup,
+    toggleLineup,
+    startMatch,
+    endMatch,
+    putOnPitch,
+    takeOffPitch,
+    setStintPosition,
+    getSessionStints,
+    getPlayerPlayMs,
     playerStats,
     matchCallUps,
     globalRatio,

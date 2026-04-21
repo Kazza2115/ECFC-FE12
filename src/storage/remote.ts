@@ -4,6 +4,8 @@ import type {
   MatchEvent,
   MatchEventType,
   Player,
+  PlayerPosition,
+  PlayerStint,
   Session,
 } from '@/types';
 
@@ -22,6 +24,9 @@ type DbSession = {
   label: string | null;
   kind: string | null;
   cancelled: boolean | null;
+  started_at: string | null;
+  ended_at: string | null;
+  starting_lineup: string[] | null;
   team_id: string;
   created_at: string;
   updated_at: string;
@@ -43,6 +48,16 @@ type DbMatchEvent = {
   note: string | null;
   team_id: string;
   created_at: string;
+};
+
+type DbStint = {
+  id: string;
+  session_id: string;
+  player_id: string;
+  position: string | null;
+  start_at: string;
+  end_at: string | null;
+  team_id: string;
 };
 
 function now(): string {
@@ -76,6 +91,9 @@ function toDbSession(s: Session): DbSession {
     label: s.label ?? null,
     kind: s.kind ?? 'training',
     cancelled: !!s.cancelled,
+    started_at: s.startedAt ?? null,
+    ended_at: s.endedAt ?? null,
+    starting_lineup: s.startingLineup ?? null,
     team_id: TEAM_ID,
     created_at: s.createdAt,
     updated_at: now(),
@@ -89,6 +107,9 @@ function fromDbSession(row: DbSession): Session {
     label: row.label ?? undefined,
     kind: (row.kind as Session['kind']) ?? 'training',
     cancelled: !!row.cancelled,
+    startedAt: row.started_at ?? undefined,
+    endedAt: row.ended_at ?? undefined,
+    startingLineup: row.starting_lineup ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -135,33 +156,57 @@ function fromDbMatchEvent(row: DbMatchEvent): MatchEvent {
   };
 }
 
+function toDbStint(st: PlayerStint): DbStint {
+  return {
+    id: st.id,
+    session_id: st.sessionId,
+    player_id: st.playerId,
+    position: st.position ?? null,
+    start_at: st.startAt,
+    end_at: st.endAt ?? null,
+    team_id: TEAM_ID,
+  };
+}
+
+function fromDbStint(row: DbStint): PlayerStint {
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    playerId: row.player_id,
+    position: (row.position as PlayerPosition) ?? undefined,
+    startAt: row.start_at,
+    endAt: row.end_at ?? undefined,
+  };
+}
+
 export type RemoteSnapshot = {
   players: Player[];
   sessions: Session[];
   attendances: Attendance[];
   matchEvents: MatchEvent[];
+  stints: PlayerStint[];
 };
 
 export const remote = {
   async fetchAll(): Promise<RemoteSnapshot> {
-    const [pRes, sRes, aRes, eRes] = await Promise.all([
+    const [pRes, sRes, aRes, eRes, stRes] = await Promise.all([
       supabase.from('ecfc_players').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_sessions').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_attendances').select('*'),
       supabase.from('ecfc_match_events').select('*').eq('team_id', TEAM_ID),
+      supabase.from('ecfc_player_stints').select('*').eq('team_id', TEAM_ID),
     ]);
     if (pRes.error) throw pRes.error;
     if (sRes.error) throw sRes.error;
     if (aRes.error) throw aRes.error;
-    if (eRes.error && eRes.error.code !== 'PGRST205' /* missing table */) {
-      // Missing-table errors on first deploy must not block other data.
-      throw eRes.error;
-    }
+    if (eRes.error && eRes.error.code !== 'PGRST205') throw eRes.error;
+    if (stRes.error && stRes.error.code !== 'PGRST205') throw stRes.error;
     return {
       players: (pRes.data ?? []).map(fromDbPlayer),
       sessions: (sRes.data ?? []).map(fromDbSession),
       attendances: (aRes.data ?? []).map(fromDbAttendance),
       matchEvents: (eRes.data ?? []).map(fromDbMatchEvent),
+      stints: (stRes.data ?? []).map(fromDbStint),
     };
   },
   async upsertPlayer(p: Player): Promise<void> {
@@ -240,6 +285,40 @@ export const remote = {
   async deleteMatchEventsForPlayer(playerId: string): Promise<void> {
     const { error } = await supabase
       .from('ecfc_match_events')
+      .delete()
+      .eq('player_id', playerId);
+    if (error) throw error;
+  },
+  async upsertStint(st: PlayerStint): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_player_stints')
+      .upsert(toDbStint(st));
+    if (error) throw error;
+  },
+  async upsertStints(list: PlayerStint[]): Promise<void> {
+    if (list.length === 0) return;
+    const { error } = await supabase
+      .from('ecfc_player_stints')
+      .upsert(list.map(toDbStint));
+    if (error) throw error;
+  },
+  async deleteStint(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_player_stints')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+  async deleteStintsForSession(sessionId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_player_stints')
+      .delete()
+      .eq('session_id', sessionId);
+    if (error) throw error;
+  },
+  async deleteStintsForPlayer(playerId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_player_stints')
       .delete()
       .eq('player_id', playerId);
     if (error) throw error;
