@@ -4,14 +4,21 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
+  Switch,
   Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '@/components/Avatar';
+import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import {
+  PRIMARY_STATUSES,
+  SECONDARY_STATUSES,
+  STATUS_META,
+} from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
@@ -30,10 +37,12 @@ export function SessionScreen({ route, navigation }: Props) {
     setAttendance,
     bulkSetAttendance,
     deleteSession,
+    toggleCancelled,
   } = useData();
 
   const session = sessions.find((s) => s.id === sessionId);
-  const [query, setQuery] = useState('');
+  const cancelled = !!session?.cancelled;
+  const [sheetPlayer, setSheetPlayer] = useState<Player | null>(null);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -42,36 +51,28 @@ export function SessionScreen({ route, navigation }: Props) {
   }, [navigation, session]);
 
   const presentCount = useMemo(() => {
-    return players.filter((p) => getStatus(sessionId, p.id) === 'present').length;
+    return players.filter((p) => {
+      const s = getStatus(sessionId, p.id);
+      return STATUS_META[s]?.countsPresent;
+    }).length;
   }, [players, getStatus, sessionId]);
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return players;
-    const q = query.toLowerCase();
-    return players.filter((p) => p.name.toLowerCase().includes(q));
-  }, [players, query]);
-
-  const toggle = async (player: Player) => {
-    const current = getStatus(sessionId, player.id);
-    const next: AttendanceStatus = current === 'present' ? 'absent' : 'present';
+  const pickStatus = async (playerId: string, status: AttendanceStatus) => {
     try {
       await Haptics.selectionAsync();
     } catch {}
-    await setAttendance(sessionId, player.id, next);
+    await setAttendance(sessionId, playerId, status);
   };
 
-  const markAllPresent = async () => {
+  const markAll = async (status: AttendanceStatus) => {
     try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await Haptics.notificationAsync(
+        status === 'present'
+          ? Haptics.NotificationFeedbackType.Success
+          : Haptics.NotificationFeedbackType.Warning,
+      );
     } catch {}
-    await bulkSetAttendance(sessionId, 'present');
-  };
-
-  const markAllAbsent = async () => {
-    try {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    } catch {}
-    await bulkSetAttendance(sessionId, 'absent');
+    await bulkSetAttendance(sessionId, status);
   };
 
   const confirmDelete = () => {
@@ -104,74 +105,184 @@ export function SessionScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <View style={styles.summaryBar}>
+      <View style={styles.topBar}>
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryValue}>
-            {presentCount}<Text style={styles.summaryDivider}>/{players.length}</Text>
+            {presentCount}
+            <Text style={styles.summaryDivider}>/{players.length}</Text>
           </Text>
-          <Text style={styles.summaryLabel}>Présents</Text>
+          <Text style={styles.summaryLabel}>
+            {cancelled ? 'Séance annulée' : 'Présents'}
+          </Text>
         </View>
-        <View style={styles.summaryActions}>
-          <Pressable style={styles.chip} onPress={markAllPresent}>
-            <Text style={styles.chipLabel}>Tout présent</Text>
-          </Pressable>
-          <Pressable style={[styles.chip, styles.chipGhost]} onPress={markAllAbsent}>
-            <Text style={[styles.chipLabel, styles.chipLabelGhost]}>Tout absent</Text>
-          </Pressable>
+        <View style={styles.cancelBlock}>
+          <View>
+            <Text style={styles.cancelTitle}>Entraînement annulé</Text>
+            <Text style={styles.cancelHint}>Exclu du taux de présence</Text>
+          </View>
+          <Switch
+            value={cancelled}
+            onValueChange={async () => {
+              try {
+                await Haptics.selectionAsync();
+              } catch {}
+              await toggleCancelled(sessionId);
+            }}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
         </View>
       </View>
 
+      {!cancelled ? (
+        <View style={styles.bulkRow}>
+          <Pressable style={styles.bulkChip} onPress={() => markAll('present')}>
+            <Text style={styles.bulkLabel}>Tout présent</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.bulkChip, styles.bulkChipGhost]}
+            onPress={() => markAll('unexcused')}
+          >
+            <Text style={[styles.bulkLabel, styles.bulkLabelGhost]}>
+              Tout absent
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       <FlatList
-        data={filtered}
+        data={players}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
         renderItem={({ item }) => {
           const status = getStatus(sessionId, item.id);
-          const isPresent = status === 'present';
+          const meta = STATUS_META[status];
+          const isSecondary = !meta.primary;
           return (
-            <Pressable onPress={() => toggle(item)}>
-              <Card
-                padded={false}
-                style={[
-                  styles.row,
-                  isPresent ? styles.rowPresent : styles.rowAbsent,
-                ]}
-              >
-                <Avatar name={item.name} size={44} />
-                <View style={styles.rowText}>
-                  <Text style={styles.rowName}>{item.name}</Text>
-                  <Text
-                    style={[
-                      styles.rowStatus,
-                      isPresent ? styles.rowStatusPresent : styles.rowStatusAbsent,
-                    ]}
-                  >
-                    {isPresent ? 'Présent' : 'Absent'}
-                  </Text>
-                </View>
-                <View
+            <Card
+              padded={false}
+              style={[
+                styles.row,
+                cancelled && styles.rowDisabled,
+                {
+                  borderLeftColor: meta.color,
+                },
+              ]}
+            >
+              <Avatar name={item.name} size={40} />
+              <View style={styles.rowText}>
+                <Text
                   style={[
-                    styles.toggle,
-                    isPresent ? styles.toggleOn : styles.toggleOff,
+                    styles.rowName,
+                    cancelled && styles.rowNameDisabled,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.name}
+                </Text>
+                <Text style={[styles.rowStatus, { color: meta.color }]}>
+                  {meta.label}
+                </Text>
+              </View>
+              <View style={styles.segmented}>
+                {PRIMARY_STATUSES.map((key) => {
+                  const sMeta = STATUS_META[key];
+                  const active = status === key;
+                  return (
+                    <Pressable
+                      key={key}
+                      disabled={cancelled}
+                      onPress={() => pickStatus(item.id, key)}
+                      style={[
+                        styles.segBtn,
+                        active && { backgroundColor: sMeta.bg },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.segGlyph,
+                          { color: active ? sMeta.color : colors.textMuted },
+                        ]}
+                      >
+                        {sMeta.glyph}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable
+                  disabled={cancelled}
+                  onPress={() => setSheetPlayer(item)}
+                  style={[
+                    styles.segBtn,
+                    isSecondary && { backgroundColor: meta.bg },
                   ]}
                 >
-                  <View
+                  <Text
                     style={[
-                      styles.knob,
-                      isPresent ? styles.knobOn : styles.knobOff,
+                      styles.segGlyph,
+                      {
+                        color: isSecondary ? meta.color : colors.textMuted,
+                        fontSize: isSecondary ? 11 : 14,
+                        fontWeight: '800',
+                      },
                     ]}
-                  />
-                </View>
-              </Card>
-            </Pressable>
+                  >
+                    {isSecondary ? meta.short : '⋯'}
+                  </Text>
+                </Pressable>
+              </View>
+            </Card>
           );
         }}
       />
 
       <View style={styles.footer}>
-        <Button label="Supprimer la séance" variant="ghost" onPress={confirmDelete} fullWidth />
+        <Button
+          label="Supprimer la séance"
+          variant="ghost"
+          onPress={confirmDelete}
+          fullWidth
+        />
       </View>
+
+      <BottomSheet
+        visible={!!sheetPlayer}
+        title={
+          sheetPlayer ? `Statut de ${sheetPlayer.name}` : 'Choisir un statut'
+        }
+        onClose={() => setSheetPlayer(null)}
+      >
+        <View style={styles.sheetGrid}>
+          {[...PRIMARY_STATUSES, ...SECONDARY_STATUSES].map((key) => {
+            const sMeta = STATUS_META[key];
+            const active =
+              sheetPlayer && getStatus(sessionId, sheetPlayer.id) === key;
+            return (
+              <Pressable
+                key={key}
+                style={[
+                  styles.sheetItem,
+                  {
+                    backgroundColor: active ? sMeta.bg : colors.background,
+                    borderColor: active ? sMeta.color : colors.border,
+                  },
+                ]}
+                onPress={async () => {
+                  if (!sheetPlayer) return;
+                  await pickStatus(sheetPlayer.id, key);
+                  setSheetPlayer(null);
+                }}
+              >
+                <Text style={[styles.sheetGlyph, { color: sMeta.color }]}>
+                  {sMeta.glyph}
+                </Text>
+                <Text style={styles.sheetLabel}>{sMeta.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -180,10 +291,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   muted: { ...typography.body, color: colors.textMuted },
-  summaryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  topBar: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.surface,
@@ -191,59 +299,92 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.md,
   },
-  summaryBlock: { flex: 0 },
-  summaryValue: { ...typography.number, fontSize: 28, color: colors.textPrimary },
+  summaryBlock: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  summaryValue: { ...typography.number, fontSize: 30, color: colors.textPrimary },
   summaryDivider: { color: colors.textMuted, fontSize: 18, fontWeight: '600' },
-  summaryLabel: { ...typography.caption, color: colors.textSecondary },
-  summaryActions: { flexDirection: 'row', gap: spacing.sm, flexShrink: 1 },
-  chip: {
+  summaryLabel: { ...typography.body, color: colors.textSecondary },
+  cancelBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 8,
+    paddingVertical: spacing.sm,
+  },
+  cancelTitle: { ...typography.bodyBold, color: colors.textPrimary },
+  cancelHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  bulkRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  bulkChip: {
+    flex: 1,
+    paddingVertical: 10,
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
+    alignItems: 'center',
   },
-  chipGhost: { backgroundColor: colors.primarySoft },
-  chipLabel: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-  chipLabelGhost: { color: colors.primary },
-  list: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
-  },
+  bulkChipGhost: { backgroundColor: colors.primarySoft },
+  bulkLabel: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  bulkLabelGhost: { color: colors.primary },
+  list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
+    padding: spacing.sm,
+    paddingRight: spacing.xs,
+    gap: spacing.sm,
     borderLeftWidth: 4,
   },
-  rowPresent: { borderLeftColor: colors.success },
-  rowAbsent: { borderLeftColor: colors.border },
-  rowText: { flex: 1 },
-  rowName: { ...typography.bodyBold, color: colors.textPrimary, fontSize: 16 },
-  rowStatus: { ...typography.caption, marginTop: 2 },
-  rowStatusPresent: { color: colors.success, fontWeight: '700' },
-  rowStatusAbsent: { color: colors.textMuted },
-  toggle: {
-    width: 52,
-    height: 32,
-    borderRadius: 16,
+  rowDisabled: { opacity: 0.4 },
+  rowText: { flex: 1, minWidth: 0 },
+  rowName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  rowNameDisabled: { textDecorationLine: 'line-through' },
+  rowStatus: { ...typography.caption, marginTop: 2, fontWeight: '600' },
+  segmented: {
+    flexDirection: 'row',
+    gap: 4,
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
     padding: 3,
+  },
+  segBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.sm,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  toggleOn: { backgroundColor: colors.success },
-  toggleOff: { backgroundColor: colors.border },
-  knob: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FFFFFF',
-  },
-  knobOn: { alignSelf: 'flex-end' },
-  knobOff: { alignSelf: 'flex-start' },
+  segGlyph: { fontSize: 16, fontWeight: '800' },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
     backgroundColor: colors.background,
   },
+  sheetGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  sheetItem: {
+    width: '48%',
+    flexGrow: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  sheetGlyph: { fontSize: 18, fontWeight: '800' },
+  sheetLabel: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
 });

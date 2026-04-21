@@ -4,14 +4,25 @@ export type Player = {
   createdAt: string;
 };
 
+export type SessionKind = 'training' | 'match';
+
 export type Session = {
   id: string;
   date: string;
   label?: string;
+  kind?: SessionKind;
+  cancelled?: boolean;
   createdAt: string;
 };
 
-export type AttendanceStatus = 'present' | 'absent';
+export type AttendanceStatus =
+  | 'present'
+  | 'sfc'
+  | 'return'
+  | 'excused'
+  | 'unexcused'
+  | 'vacation'
+  | 'not_called';
 
 export type Attendance = {
   playerId: string;
@@ -22,6 +33,13 @@ export type Attendance = {
 export type PlayerStats = {
   player: Player;
   present: number;
-  total: number;
+  sfc: number;
+  ret: number;
+  excused: number;
+  unexcused: number;
+  vacation: number;
+  notCalled: number;
+  totalPresent: number;
+  totalSessions: number;
   ratio: number;
 };

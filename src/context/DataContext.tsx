@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { db, SEED_PLAYERS } from '@/storage/database';
+import { STATUS_META, DEFAULT_STATUS } from '@/constants/statuses';
 import { uid } from '@/utils/id';
 import { todayISO } from '@/utils/date';
 import type {
@@ -8,6 +9,7 @@ import type {
   Player,
   PlayerStats,
   Session,
+  SessionKind,
 } from '@/types';
 
 type DataContextValue = {
@@ -18,14 +20,16 @@ type DataContextValue = {
   addPlayer: (name: string) => Promise<Player>;
   removePlayer: (id: string) => Promise<void>;
   renamePlayer: (id: string, name: string) => Promise<void>;
-  createSession: (label?: string) => Promise<Session>;
+  createSession: (opts?: { kind?: SessionKind; label?: string; date?: string }) => Promise<Session>;
   deleteSession: (id: string) => Promise<void>;
+  toggleCancelled: (sessionId: string) => Promise<void>;
   setAttendance: (sessionId: string, playerId: string, status: AttendanceStatus) => Promise<void>;
   bulkSetAttendance: (sessionId: string, status: AttendanceStatus) => Promise<void>;
   getStatus: (sessionId: string, playerId: string) => AttendanceStatus;
   getSessionAttendance: (sessionId: string) => Attendance[];
   playerStats: PlayerStats[];
   globalRatio: number;
+  activeSessionsCount: number;
   resetAll: () => Promise<void>;
 };
 
@@ -59,7 +63,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ]);
         setPlayers(p);
         setSessions(s);
-        setAttendances(a);
+        setAttendances(migrateAttendances(a));
       }
       setLoading(false);
     })();
@@ -90,11 +94,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     await db.savePlayers(next);
   }, [players]);
 
-  const createSession = useCallback(async (label?: string) => {
+  const createSession = useCallback(async (opts?: { kind?: SessionKind; label?: string; date?: string }) => {
     const session: Session = {
       id: uid(),
-      date: todayISO(),
-      label,
+      date: opts?.date ?? todayISO(),
+      label: opts?.label,
+      kind: opts?.kind ?? 'training',
+      cancelled: false,
       createdAt: todayISO(),
     };
     const next = [session, ...sessions];
@@ -113,6 +119,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       db.saveAttendances(nextAttendances),
     ]);
   }, [sessions, attendances]);
+
+  const toggleCancelled = useCallback(async (sessionId: string) => {
+    const next = sessions.map((s) =>
+      s.id === sessionId ? { ...s, cancelled: !s.cancelled } : s,
+    );
+    setSessions(next);
+    await db.saveSessions(next);
+  }, [sessions]);
 
   const setAttendance = useCallback(async (sessionId: string, playerId: string, status: AttendanceStatus) => {
     const existingIndex = attendances.findIndex(
@@ -143,32 +157,73 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const getStatus = useCallback((sessionId: string, playerId: string): AttendanceStatus => {
     const record = attendances.find((a) => a.sessionId === sessionId && a.playerId === playerId);
-    return record ? record.status : 'absent';
+    return record ? record.status : DEFAULT_STATUS;
   }, [attendances]);
 
   const getSessionAttendance = useCallback((sessionId: string) => {
     return attendances.filter((a) => a.sessionId === sessionId);
   }, [attendances]);
 
+  const activeSessions = useMemo(
+    () => sessions.filter((s) => !s.cancelled),
+    [sessions],
+  );
+  const activeSessionIds = useMemo(
+    () => new Set(activeSessions.map((s) => s.id)),
+    [activeSessions],
+  );
+
   const playerStats = useMemo<PlayerStats[]>(() => {
-    const total = sessions.length;
+    const totalSessions = activeSessions.length;
     return players
       .map((player) => {
-        const present = attendances.filter(
-          (a) => a.playerId === player.id && a.status === 'present',
-        ).length;
-        const ratio = total === 0 ? 0 : present / total;
-        return { player, present, total, ratio };
+        const counts = {
+          present: 0,
+          sfc: 0,
+          return: 0,
+          excused: 0,
+          unexcused: 0,
+          vacation: 0,
+          not_called: 0,
+        } as Record<AttendanceStatus, number>;
+
+        for (const a of attendances) {
+          if (a.playerId !== player.id) continue;
+          if (!activeSessionIds.has(a.sessionId)) continue;
+          counts[a.status] = (counts[a.status] ?? 0) + 1;
+        }
+
+        const totalPresent =
+          counts.present + counts.sfc + counts.return;
+        const ratio = totalSessions === 0 ? 0 : totalPresent / totalSessions;
+
+        return {
+          player,
+          present: counts.present,
+          sfc: counts.sfc,
+          ret: counts.return,
+          excused: counts.excused,
+          unexcused: counts.unexcused,
+          vacation: counts.vacation,
+          notCalled: counts.not_called,
+          totalPresent,
+          totalSessions,
+          ratio,
+        };
       })
       .sort((a, b) => b.ratio - a.ratio);
-  }, [players, sessions, attendances]);
+  }, [players, activeSessions, activeSessionIds, attendances]);
 
   const globalRatio = useMemo(() => {
-    if (sessions.length === 0 || players.length === 0) return 0;
-    const possible = sessions.length * players.length;
-    const present = attendances.filter((a) => a.status === 'present').length;
+    if (activeSessions.length === 0 || players.length === 0) return 0;
+    const possible = activeSessions.length * players.length;
+    let present = 0;
+    for (const a of attendances) {
+      if (!activeSessionIds.has(a.sessionId)) continue;
+      if (STATUS_META[a.status]?.countsPresent) present += 1;
+    }
     return possible === 0 ? 0 : present / possible;
-  }, [players, sessions, attendances]);
+  }, [players, activeSessions, activeSessionIds, attendances]);
 
   const resetAll = useCallback(async () => {
     await db.resetAll();
@@ -187,16 +242,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     renamePlayer,
     createSession,
     deleteSession,
+    toggleCancelled,
     setAttendance,
     bulkSetAttendance,
     getStatus,
     getSessionAttendance,
     playerStats,
     globalRatio,
+    activeSessionsCount: activeSessions.length,
     resetAll,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+}
+
+function migrateAttendances(list: Attendance[]): Attendance[] {
+  return list.map((a) => {
+    const status = a.status as string;
+    if (status === 'absent') return { ...a, status: 'unexcused' };
+    return a;
+  });
 }
 
 export function useData(): DataContextValue {

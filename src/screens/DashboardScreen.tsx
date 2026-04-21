@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -16,7 +16,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, spacing, typography } from '@/theme';
-import { formatDate } from '@/utils/date';
+import { formatDate, nextTrainingDates, sameDay } from '@/utils/date';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -28,19 +28,46 @@ type Nav = CompositeNavigationProp<
 >;
 
 export function DashboardScreen({ navigation }: { navigation: Nav }) {
-  const { players, sessions, playerStats, globalRatio, createSession } = useData();
+  const {
+    players,
+    sessions,
+    playerStats,
+    globalRatio,
+    activeSessionsCount,
+    createSession,
+  } = useData();
 
   const topPlayers = playerStats.slice(0, 5);
   const lastSession = sessions[0];
+
+  const upcoming = useMemo(() => {
+    const candidates = nextTrainingDates(3);
+    return candidates
+      .filter(
+        (iso) =>
+          !sessions.some(
+            (s) => !s.cancelled && sameDay(s.date, iso),
+          ),
+      )
+      .slice(0, 3);
+  }, [sessions]);
 
   const handleNewSession = async () => {
     const session = await createSession();
     navigation.navigate('Session', { sessionId: session.id });
   };
 
+  const quickSession = async (iso: string) => {
+    const session = await createSession({ date: iso, kind: 'training' });
+    navigation.navigate('Session', { sessionId: session.id });
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Bonjour Coach</Text>
@@ -57,12 +84,15 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             <View style={styles.heroText}>
               <Text style={styles.heroTitle}>Taux de présence</Text>
               <Text style={styles.heroHint}>
-                {sessions.length === 0
+                {activeSessionsCount === 0
                   ? 'Lancez votre première séance'
-                  : `${sessions.length} séance${sessions.length > 1 ? 's' : ''} enregistrée${sessions.length > 1 ? 's' : ''}`}
+                  : `${activeSessionsCount} séance${activeSessionsCount > 1 ? 's' : ''} prise${activeSessionsCount > 1 ? 's' : ''} en compte`}
               </Text>
               {lastSession ? (
-                <Text style={styles.heroMeta}>Dernière : {formatDate(lastSession.date)}</Text>
+                <Text style={styles.heroMeta}>
+                  Dernière : {formatDate(lastSession.date)}
+                  {lastSession.cancelled ? ' (annulée)' : ''}
+                </Text>
               ) : null}
             </View>
           </View>
@@ -71,12 +101,21 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         <View style={styles.statsRow}>
           <StatCard label="Joueurs" value={players.length} accent={colors.primary} />
           <View style={{ width: spacing.md }} />
-          <StatCard label="Séances" value={sessions.length} accent={colors.accent} />
+          <StatCard
+            label="Activités"
+            value={activeSessionsCount}
+            hint={
+              sessions.length !== activeSessionsCount
+                ? `${sessions.length - activeSessionsCount} annulée${sessions.length - activeSessionsCount > 1 ? 's' : ''}`
+                : undefined
+            }
+            accent={colors.accent}
+          />
         </View>
 
         <View style={styles.actions}>
           <Button
-            label="Nouvelle session"
+            label="Nouvelle session (aujourd'hui)"
             onPress={handleNewSession}
             icon={<Text style={styles.actionGlyph}>＋</Text>}
             fullWidth
@@ -90,6 +129,23 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
           />
         </View>
 
+        {upcoming.length > 0 ? (
+          <View style={styles.upcomingBlock}>
+            <Text style={styles.sectionLabel}>Prochains entraînements</Text>
+            <View style={styles.upcomingRow}>
+              {upcoming.map((iso) => (
+                <Pressable
+                  key={iso}
+                  style={styles.chip}
+                  onPress={() => quickSession(iso)}
+                >
+                  <Text style={styles.chipLabel}>{formatDate(iso)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Top assiduité</Text>
           <Pressable onPress={() => navigation.navigate('Stats')}>
@@ -97,7 +153,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
           </Pressable>
         </View>
 
-        {topPlayers.length === 0 || sessions.length === 0 ? (
+        {topPlayers.length === 0 || activeSessionsCount === 0 ? (
           <Card>
             <EmptyState
               title="Pas encore de stats"
@@ -119,7 +175,9 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
                 </View>
                 <Avatar name={stat.player.name} size={36} />
                 <View style={styles.playerInfo}>
-                  <Text style={styles.playerName}>{stat.player.name}</Text>
+                  <Text style={styles.playerName} numberOfLines={1}>
+                    {stat.player.name}
+                  </Text>
                   <View style={styles.barWrapper}>
                     <ProgressBar value={stat.ratio} height={6} />
                   </View>
@@ -177,6 +235,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   actionGlyph: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  upcomingBlock: {
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+  },
+  sectionLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    marginBottom: spacing.sm,
+  },
+  upcomingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  chipLabel: { color: colors.primary, fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -210,8 +286,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rankText: { ...typography.caption, color: colors.primary, fontWeight: '800' },
-  playerInfo: { flex: 1 },
+  playerInfo: { flex: 1, minWidth: 0 },
   playerName: { ...typography.bodyBold, color: colors.textPrimary },
   barWrapper: { marginTop: 6 },
-  playerPct: { ...typography.bodyBold, color: colors.textPrimary, minWidth: 44, textAlign: 'right' },
+  playerPct: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    minWidth: 44,
+    textAlign: 'right',
+  },
 });
