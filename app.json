@@ -6,9 +6,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "ecfc",
+    "icon": "./assets/logo.png",
     "splash": {
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#D7141A"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -19,13 +21,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#D7141A"
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "ch.etoilecarougefc.attendance"
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/logo.png"
     },
     "plugins": [
       [
