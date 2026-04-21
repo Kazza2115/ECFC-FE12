@@ -28,11 +28,17 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Export Expo web build
         run: npx expo export --platform web
+
+      - name: Disable Jekyll processing
+        run: touch dist/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
