@@ -20,6 +20,7 @@ type DataContextValue = {
   addPlayer: (name: string) => Promise<Player>;
   removePlayer: (id: string) => Promise<void>;
   renamePlayer: (id: string, name: string) => Promise<void>;
+  setPlayerPhoto: (id: string, photoUri: string | undefined) => Promise<void>;
   createSession: (opts?: { kind?: SessionKind; label?: string; date?: string }) => Promise<Session>;
   deleteSession: (id: string) => Promise<void>;
   toggleCancelled: (sessionId: string) => Promise<void>;
@@ -90,6 +91,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const renamePlayer = useCallback(async (id: string, name: string) => {
     const next = players.map((p) => (p.id === id ? { ...p, name: name.trim() } : p));
+    setPlayers(next);
+    await db.savePlayers(next);
+  }, [players]);
+
+  const setPlayerPhoto = useCallback(async (id: string, photoUri: string | undefined) => {
+    const next = players.map((p) => (p.id === id ? { ...p, photoUri } : p));
     setPlayers(next);
     await db.savePlayers(next);
   }, [players]);
@@ -240,6 +247,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     addPlayer,
     removePlayer,
     renamePlayer,
+    setPlayerPhoto,
     createSession,
     deleteSession,
     toggleCancelled,

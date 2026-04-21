@@ -1,9 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, typography } from '@/theme';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { typography } from '@/theme';
 
 const PALETTE = [
-  '#0B7A3B',
+  '#D7141A',
   '#1E3A8A',
   '#B45309',
   '#6D28D9',
@@ -30,18 +30,30 @@ function initials(name: string): string {
 
 type Props = {
   name: string;
+  photoUri?: string;
   size?: number;
 };
 
-export function Avatar({ name, size = 40 }: Props) {
+export function Avatar({ name, photoUri, size = 40 }: Props) {
   const color = PALETTE[hashString(name) % PALETTE.length];
+  const styleBase = {
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+  };
+
+  if (photoUri) {
+    return (
+      <Image
+        source={{ uri: photoUri }}
+        style={[styles.image, styleBase]}
+        resizeMode="cover"
+      />
+    );
+  }
+
   return (
-    <View
-      style={[
-        styles.circle,
-        { backgroundColor: color, width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
+    <View style={[styles.circle, styleBase, { backgroundColor: color }]}>
       <Text style={[styles.text, { fontSize: size * 0.4 }]}>{initials(name)}</Text>
     </View>
   );
@@ -51,6 +63,9 @@ const styles = StyleSheet.create({
   circle: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  image: {
+    backgroundColor: '#E5E7EB',
   },
   text: {
     ...typography.bodyBold,

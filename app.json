@@ -8,7 +8,7 @@
     "scheme": "ecfc",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#0B7A3B"
+      "backgroundColor": "#D7141A"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -19,7 +19,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0B7A3B"
+        "backgroundColor": "#D7141A"
       },
       "package": "ch.etoilecarougefc.attendance"
     },
@@ -27,6 +27,14 @@
       "bundler": "metro",
       "output": "single"
     },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "L'app accède à vos photos pour ajouter la photo d'un joueur."
+        }
+      ]
+    ],
     "experiments": {
       "baseUrl": "/ECFC-FE12"
     }

@@ -11,6 +11,7 @@ import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { ClubLogo } from '@/components/ClubLogo';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -73,9 +74,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             <Text style={styles.greeting}>Bonjour Coach</Text>
             <Text style={styles.subtitle}>Étoile Carouge FC · Juniors</Text>
           </View>
-          <View style={styles.logoBadge}>
-            <Text style={styles.logoText}>ECFC</Text>
-          </View>
+          <ClubLogo size={48} />
         </View>
 
         <Card style={styles.heroCard}>
@@ -173,7 +172,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
                 <View style={styles.rankBadge}>
                   <Text style={styles.rankText}>{index + 1}</Text>
                 </View>
-                <Avatar name={stat.player.name} size={36} />
+                <Avatar name={stat.player.name} photoUri={stat.player.photoUri} size={36} />
                 <View style={styles.playerInfo}>
                   <Text style={styles.playerName} numberOfLines={1}>
                     {stat.player.name}
@@ -207,15 +206,6 @@ const styles = StyleSheet.create({
   },
   greeting: { ...typography.h1, color: colors.textPrimary },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
-  logoBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: { color: '#fff', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 },
   heroCard: {
     marginHorizontal: spacing.lg,
     marginTop: spacing.sm,

@@ -178,7 +178,7 @@ export function StatsScreen() {
                     index < playerStats.length - 1 && styles.rowDivider,
                   ]}
                 >
-                  <Avatar name={stat.player.name} size={40} />
+                  <Avatar name={stat.player.name} photoUri={stat.player.photoUri} size={40} />
                   <View style={styles.playerInfo}>
                     <View style={styles.playerTop}>
                       <Text style={styles.playerName} numberOfLines={1}>

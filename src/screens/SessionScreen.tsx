@@ -164,7 +164,7 @@ export function SessionScreen({ route, navigation }: Props) {
                 },
               ]}
             >
-              <Avatar name={item.name} size={40} />
+              <Avatar name={item.name} photoUri={item.photoUri} size={40} />
               <View style={styles.rowText}>
                 <Text
                   style={[
