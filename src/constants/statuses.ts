@@ -1,4 +1,4 @@
-import type { AttendanceStatus } from '@/types';
+import type { AttendanceStatus, SessionKind } from '@/types';
 
 export type StatusMeta = {
   key: AttendanceStatus;
@@ -84,17 +84,65 @@ export const STATUS_META: Record<AttendanceStatus, StatusMeta> = {
   },
 };
 
-export const PRIMARY_STATUSES: AttendanceStatus[] = [
+export const PRIMARY_STATUSES_TRAINING: AttendanceStatus[] = [
   'present',
   'excused',
   'unexcused',
 ];
 
-export const SECONDARY_STATUSES: AttendanceStatus[] = [
+export const PRIMARY_STATUSES_MATCH: AttendanceStatus[] = [
+  'present',
+  'not_called',
+  'excused',
+];
+
+export const SECONDARY_STATUSES_TRAINING: AttendanceStatus[] = [
   'sfc',
   'return',
   'vacation',
   'not_called',
 ];
 
+export const SECONDARY_STATUSES_MATCH: AttendanceStatus[] = [
+  'unexcused',
+  'sfc',
+  'return',
+  'vacation',
+];
+
+export function primaryStatusesFor(kind: SessionKind | undefined): AttendanceStatus[] {
+  return kind === 'match' ? PRIMARY_STATUSES_MATCH : PRIMARY_STATUSES_TRAINING;
+}
+
+export function secondaryStatusesFor(kind: SessionKind | undefined): AttendanceStatus[] {
+  return kind === 'match' ? SECONDARY_STATUSES_MATCH : SECONDARY_STATUSES_TRAINING;
+}
+
+export function labelForStatus(
+  kind: SessionKind | undefined,
+  status: AttendanceStatus,
+): string {
+  if (kind === 'match') {
+    if (status === 'present') return 'Convoqué';
+    if (status === 'not_called') return 'Non convoqué';
+  }
+  return STATUS_META[status].label;
+}
+
+export function shortForStatus(
+  kind: SessionKind | undefined,
+  status: AttendanceStatus,
+): string {
+  if (kind === 'match') {
+    if (status === 'present') return 'Conv.';
+    if (status === 'not_called') return 'Non';
+  }
+  return STATUS_META[status].short;
+}
+
 export const DEFAULT_STATUS: AttendanceStatus = 'present';
+export const DEFAULT_MATCH_STATUS: AttendanceStatus = 'not_called';
+
+export function defaultStatusFor(kind: SessionKind | undefined): AttendanceStatus {
+  return kind === 'match' ? DEFAULT_MATCH_STATUS : DEFAULT_STATUS;
+}

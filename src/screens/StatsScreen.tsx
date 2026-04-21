@@ -29,8 +29,10 @@ export function StatsScreen() {
     sessions,
     attendances,
     playerStats,
+    matchCallUps,
     globalRatio,
-    activeSessionsCount,
+    activeTrainingsCount,
+    activeMatchesCount,
   } = useData();
 
   const best = playerStats[0];
@@ -50,10 +52,10 @@ export function StatsScreen() {
 
   const exportCSV = async () => {
     try {
-      if (activeSessionsCount === 0) {
+      if (activeTrainingsCount === 0 && activeMatchesCount === 0) {
         Alert.alert(
           'Aucune donnée',
-          'Créez au moins une séance active avant d\'exporter.',
+          'Créez au moins une séance avant d\'exporter.',
         );
         return;
       }
@@ -93,11 +95,13 @@ export function StatsScreen() {
     }
   };
 
+  const hasAnyData = activeTrainingsCount > 0 || activeMatchesCount > 0;
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScreenHeader
         title="Statistiques"
-        subtitle="Vue complète de l'assiduité"
+        subtitle="Assiduité entraînement et matchs"
         right={
           <Pressable style={styles.exportBtn} onPress={exportCSV}>
             <Text style={styles.exportLabel}>Export CSV</Text>
@@ -109,7 +113,7 @@ export function StatsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {activeSessionsCount === 0 || players.length === 0 ? (
+        {!hasAnyData || players.length === 0 ? (
           <Card>
             <EmptyState
               title="Pas encore de données"
@@ -118,124 +122,193 @@ export function StatsScreen() {
           </Card>
         ) : (
           <>
-            <Card style={styles.hero}>
-              <View style={styles.heroRow}>
-                <ProgressRing
-                  value={globalRatio}
-                  size={130}
-                  strokeWidth={12}
-                  label="global"
-                />
-                <View style={styles.heroText}>
-                  <Text style={styles.heroTitle}>Assiduité globale</Text>
-                  <Text style={styles.heroHint}>
-                    {players.length} joueurs · {activeSessionsCount} activités
-                  </Text>
-                  {best ? (
-                    <View style={styles.heroMetaRow}>
-                      <Text style={styles.heroMetaLabel}>Meilleur</Text>
-                      <Text style={styles.heroMetaValue}>
-                        {best.player.name} · {Math.round(best.ratio * 100)}%
-                      </Text>
-                    </View>
-                  ) : null}
-                  {worst && worst !== best ? (
-                    <View style={styles.heroMetaRow}>
-                      <Text style={styles.heroMetaLabel}>À encourager</Text>
-                      <Text style={styles.heroMetaValue}>
-                        {worst.player.name} · {Math.round(worst.ratio * 100)}%
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-            </Card>
+            {activeTrainingsCount > 0 ? (
+              <>
+                <Text style={styles.sectionHeader}>🏋️  Entraînements</Text>
 
-            <View style={styles.statsRow}>
-              <StatCard
-                label="Présents"
-                value={totals.present}
-                hint={`+ ${totals.sfc} SFC · ${totals.ret} RC`}
-                accent={STATUS_META.present.color}
-              />
-              <View style={{ width: spacing.md }} />
-              <StatCard
-                label="Absences"
-                value={totals.excused + totals.unexcused}
-                hint={`${totals.excused} exc · ${totals.unexcused} non exc`}
-                accent={STATUS_META.unexcused.color}
-              />
-            </View>
-
-            <Text style={styles.sectionTitle}>Par joueur</Text>
-
-            <Card padded={false} style={styles.listCard}>
-              {playerStats.map((stat, index) => (
-                <View
-                  key={stat.player.id}
-                  style={[
-                    styles.playerRow,
-                    index < playerStats.length - 1 && styles.rowDivider,
-                  ]}
-                >
-                  <Avatar name={stat.player.name} photoUri={stat.player.photoUri} size={40} />
-                  <View style={styles.playerInfo}>
-                    <View style={styles.playerTop}>
-                      <Text style={styles.playerName} numberOfLines={1}>
-                        {stat.player.name}
+                <Card style={styles.hero}>
+                  <View style={styles.heroRow}>
+                    <ProgressRing
+                      value={globalRatio}
+                      size={120}
+                      strokeWidth={12}
+                      label="global"
+                    />
+                    <View style={styles.heroText}>
+                      <Text style={styles.heroTitle}>Assiduité</Text>
+                      <Text style={styles.heroHint}>
+                        {players.length} joueurs · {activeTrainingsCount}{' '}
+                        entraînement{activeTrainingsCount > 1 ? 's' : ''}
                       </Text>
-                      <Text style={styles.playerPct}>
-                        {Math.round(stat.ratio * 100)}%
-                      </Text>
-                    </View>
-                    <View style={styles.barWrap}>
-                      <ProgressBar value={stat.ratio} height={6} />
-                    </View>
-                    <Text style={styles.playerMeta}>
-                      {stat.totalPresent} / {stat.totalSessions} activité
-                      {stat.totalSessions > 1 ? 's' : ''}
-                    </Text>
-                    <View style={styles.miniStats}>
-                      {stat.sfc > 0 ? (
-                        <MiniStat
-                          label="SFC"
-                          value={stat.sfc}
-                          color={STATUS_META.sfc.color}
-                        />
+                      {best ? (
+                        <View style={styles.heroMetaRow}>
+                          <Text style={styles.heroMetaLabel}>Meilleur</Text>
+                          <Text style={styles.heroMetaValue}>
+                            {best.player.name} · {Math.round(best.ratio * 100)}%
+                          </Text>
+                        </View>
                       ) : null}
-                      {stat.excused > 0 ? (
-                        <MiniStat
-                          label="Exc"
-                          value={stat.excused}
-                          color={STATUS_META.excused.color}
-                        />
-                      ) : null}
-                      {stat.unexcused > 0 ? (
-                        <MiniStat
-                          label="Abs"
-                          value={stat.unexcused}
-                          color={STATUS_META.unexcused.color}
-                        />
-                      ) : null}
-                      {stat.vacation > 0 ? (
-                        <MiniStat
-                          label="Vac"
-                          value={stat.vacation}
-                          color={STATUS_META.vacation.color}
-                        />
-                      ) : null}
-                      {stat.notCalled > 0 ? (
-                        <MiniStat
-                          label="NC"
-                          value={stat.notCalled}
-                          color={STATUS_META.not_called.color}
-                        />
+                      {worst && worst !== best ? (
+                        <View style={styles.heroMetaRow}>
+                          <Text style={styles.heroMetaLabel}>À encourager</Text>
+                          <Text style={styles.heroMetaValue}>
+                            {worst.player.name} ·{' '}
+                            {Math.round(worst.ratio * 100)}%
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                   </View>
+                </Card>
+
+                <View style={styles.statsRow}>
+                  <StatCard
+                    label="Présents"
+                    value={totals.present}
+                    hint={`+ ${totals.sfc} SFC · ${totals.ret} RC`}
+                    accent={STATUS_META.present.color}
+                  />
+                  <View style={{ width: spacing.md }} />
+                  <StatCard
+                    label="Absences"
+                    value={totals.excused + totals.unexcused}
+                    hint={`${totals.excused} exc · ${totals.unexcused} non exc`}
+                    accent={STATUS_META.unexcused.color}
+                  />
                 </View>
-              ))}
-            </Card>
+
+                <Card padded={false} style={styles.listCard}>
+                  {playerStats.map((stat, index) => (
+                    <View
+                      key={stat.player.id}
+                      style={[
+                        styles.playerRow,
+                        index < playerStats.length - 1 && styles.rowDivider,
+                      ]}
+                    >
+                      <Avatar
+                        name={stat.player.name}
+                        photoUri={stat.player.photoUri}
+                        size={40}
+                      />
+                      <View style={styles.playerInfo}>
+                        <View style={styles.playerTop}>
+                          <Text style={styles.playerName} numberOfLines={1}>
+                            {stat.player.name}
+                          </Text>
+                          <Text style={styles.playerPct}>
+                            {Math.round(stat.ratio * 100)}%
+                          </Text>
+                        </View>
+                        <View style={styles.barWrap}>
+                          <ProgressBar value={stat.ratio} height={6} />
+                        </View>
+                        <Text style={styles.playerMeta}>
+                          {stat.totalPresent} / {stat.totalSessions}
+                        </Text>
+                        <View style={styles.miniStats}>
+                          {stat.sfc > 0 ? (
+                            <MiniStat
+                              label="SFC"
+                              value={stat.sfc}
+                              color={STATUS_META.sfc.color}
+                            />
+                          ) : null}
+                          {stat.excused > 0 ? (
+                            <MiniStat
+                              label="Exc"
+                              value={stat.excused}
+                              color={STATUS_META.excused.color}
+                            />
+                          ) : null}
+                          {stat.unexcused > 0 ? (
+                            <MiniStat
+                              label="Abs"
+                              value={stat.unexcused}
+                              color={STATUS_META.unexcused.color}
+                            />
+                          ) : null}
+                          {stat.vacation > 0 ? (
+                            <MiniStat
+                              label="Vac"
+                              value={stat.vacation}
+                              color={STATUS_META.vacation.color}
+                            />
+                          ) : null}
+                          {stat.notCalled > 0 ? (
+                            <MiniStat
+                              label="NC"
+                              value={stat.notCalled}
+                              color={STATUS_META.not_called.color}
+                            />
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            ) : null}
+
+            {activeMatchesCount > 0 ? (
+              <>
+                <Text style={styles.sectionHeader}>⚽  Convocations match</Text>
+                <Card padded={false} style={styles.listCard}>
+                  {matchCallUps.map((stat, index) => (
+                    <View
+                      key={stat.player.id}
+                      style={[
+                        styles.playerRow,
+                        index < matchCallUps.length - 1 && styles.rowDivider,
+                      ]}
+                    >
+                      <Avatar
+                        name={stat.player.name}
+                        photoUri={stat.player.photoUri}
+                        size={40}
+                      />
+                      <View style={styles.playerInfo}>
+                        <View style={styles.playerTop}>
+                          <Text style={styles.playerName} numberOfLines={1}>
+                            {stat.player.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.playerPct,
+                              { color: STATUS_META.sfc.color },
+                            ]}
+                          >
+                            {stat.called} / {stat.total}
+                          </Text>
+                        </View>
+                        <View style={styles.barWrap}>
+                          <ProgressBar value={stat.ratio} height={6} />
+                        </View>
+                        <View style={styles.miniStats}>
+                          <MiniStat
+                            label="Conv"
+                            value={stat.called}
+                            color={STATUS_META.present.color}
+                          />
+                          <MiniStat
+                            label="Non"
+                            value={stat.notCalled}
+                            color={STATUS_META.not_called.color}
+                          />
+                          {stat.absent > 0 ? (
+                            <MiniStat
+                              label="Abs"
+                              value={stat.absent}
+                              color={STATUS_META.unexcused.color}
+                            />
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </Card>
+              </>
+            ) : null}
           </>
         )}
         <View style={{ height: spacing.xl }} />
@@ -285,6 +358,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   exportLabel: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  sectionHeader: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+  },
   hero: {},
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
@@ -302,11 +380,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   statsRow: { flexDirection: 'row' },
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginTop: spacing.md,
-  },
   listCard: {},
   playerRow: {
     flexDirection: 'row',

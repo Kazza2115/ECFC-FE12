@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,48 +22,132 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Sessions'>;
 
+type Filter = 'all' | 'training' | 'match';
+
 export function SessionsListScreen({ navigation }: Props) {
   const { sessions, players, getSessionAttendance, createSession } = useData();
+  const [filter, setFilter] = useState<Filter>('all');
+  const [matchModalOpen, setMatchModalOpen] = useState(false);
+  const [opponent, setOpponent] = useState('');
 
-  const newSession = async () => {
-    const s = await createSession();
+  const filtered = useMemo(() => {
+    if (filter === 'all') return sessions;
+    if (filter === 'match') return sessions.filter((s) => s.kind === 'match');
+    return sessions.filter((s) => s.kind !== 'match');
+  }, [sessions, filter]);
+
+  const startTraining = async () => {
+    const s = await createSession({ kind: 'training' });
+    navigation.navigate('Session', { sessionId: s.id });
+  };
+
+  const openMatchModal = () => {
+    setOpponent('');
+    setMatchModalOpen(true);
+  };
+
+  const startMatch = async () => {
+    const label = opponent.trim();
+    const s = await createSession({ kind: 'match', label: label || undefined });
+    setMatchModalOpen(false);
+    setOpponent('');
     navigation.navigate('Session', { sessionId: s.id });
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
-        {sessions.length === 0 ? (
+        <View style={styles.filterRow}>
+          {(['all', 'training', 'match'] as Filter[]).map((f) => (
+            <Pressable
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[styles.filterChip, filter === f && styles.filterChipActive]}
+            >
+              <Text
+                style={[
+                  styles.filterLabel,
+                  filter === f && styles.filterLabelActive,
+                ]}
+              >
+                {f === 'all'
+                  ? 'Tout'
+                  : f === 'training'
+                  ? 'Entraînements'
+                  : 'Matchs'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={styles.quickActions}>
+          <View style={{ flex: 1 }}>
+            <Button label="+ Entraînement" onPress={startTraining} fullWidth />
+          </View>
+          <View style={{ width: spacing.sm }} />
+          <View style={{ flex: 1 }}>
+            <Button
+              label="+ Match"
+              onPress={openMatchModal}
+              variant="secondary"
+              fullWidth
+            />
+          </View>
+        </View>
+
+        {filtered.length === 0 ? (
           <Card>
             <EmptyState
-              title="Aucune séance"
-              description="Lancez votre première séance pour commencer le suivi."
-            >
-              <Button label="Nouvelle session" onPress={newSession} fullWidth />
-            </EmptyState>
+              title={
+                filter === 'match'
+                  ? 'Aucun match'
+                  : filter === 'training'
+                  ? 'Aucun entraînement'
+                  : 'Aucune séance'
+              }
+              description="Utilisez les boutons ci-dessus pour en créer un."
+            />
           </Card>
         ) : (
-          <>
-            <Button label="Nouvelle session" onPress={newSession} fullWidth />
-            <View style={{ height: spacing.md }} />
-            {sessions.map((s) => {
-              const att = getSessionAttendance(s.id);
-              const present = att.filter(
-                (a) => STATUS_META[a.status]?.countsPresent,
-              ).length;
-              const ratio =
-                players.length === 0 ? 0 : present / players.length;
-              return (
-                <Pressable
-                  key={s.id}
-                  onPress={() =>
-                    navigation.navigate('Session', { sessionId: s.id })
-                  }
+          filtered.map((s) => {
+            const isMatch = s.kind === 'match';
+            const att = getSessionAttendance(s.id);
+            const presentOrCalled = att.filter((a) =>
+              STATUS_META[a.status]?.countsPresent,
+            ).length;
+            const ratio =
+              players.length === 0 ? 0 : presentOrCalled / players.length;
+            return (
+              <Pressable
+                key={s.id}
+                onPress={() =>
+                  navigation.navigate('Session', { sessionId: s.id })
+                }
+              >
+                <Card
+                  style={[styles.row, s.cancelled && styles.rowCancelled]}
                 >
-                  <Card
-                    style={[styles.row, s.cancelled && styles.rowCancelled]}
-                  >
-                    <View style={styles.rowHeader}>
+                  <View style={styles.rowHeader}>
+                    <View style={styles.rowTitleBlock}>
+                      <View
+                        style={[
+                          styles.kindBadge,
+                          isMatch
+                            ? styles.kindBadgeMatch
+                            : styles.kindBadgeTraining,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.kindBadgeText,
+                            isMatch
+                              ? styles.kindBadgeTextMatch
+                              : styles.kindBadgeTextTraining,
+                          ]}
+                        >
+                          {isMatch ? '⚽ Match' : '🏋️ Entraînement'}
+                        </Text>
+                      </View>
                       <Text
                         style={[
                           styles.rowTitle,
@@ -70,33 +156,72 @@ export function SessionsListScreen({ navigation }: Props) {
                       >
                         {formatDate(s.date)}
                       </Text>
-                      {s.cancelled ? (
-                        <View style={styles.cancelPill}>
-                          <Text style={styles.cancelPillLabel}>Annulée</Text>
-                        </View>
-                      ) : (
-                        <Text style={styles.rowPct}>
-                          {Math.round(ratio * 100)}%
-                        </Text>
-                      )}
                     </View>
-                    <Text style={styles.rowMeta}>
-                      {s.cancelled
-                        ? 'Exclue du taux de présence'
-                        : `${present} présents / ${players.length} joueurs`}
-                    </Text>
-                    {!s.cancelled ? (
-                      <View style={styles.barWrap}>
-                        <ProgressBar value={ratio} height={6} />
+                    {s.cancelled ? (
+                      <View style={styles.cancelPill}>
+                        <Text style={styles.cancelPillLabel}>Annulé</Text>
                       </View>
-                    ) : null}
-                  </Card>
-                </Pressable>
-              );
-            })}
-          </>
+                    ) : (
+                      <Text style={styles.rowPct}>
+                        {isMatch
+                          ? `${presentOrCalled}/${players.length}`
+                          : `${Math.round(ratio * 100)}%`}
+                      </Text>
+                    )}
+                  </View>
+                  {s.label ? (
+                    <Text style={styles.rowLabel}>vs {s.label}</Text>
+                  ) : null}
+                  <Text style={styles.rowMeta}>
+                    {s.cancelled
+                      ? 'Exclu des statistiques'
+                      : isMatch
+                      ? `${presentOrCalled} convoqués / ${players.length}`
+                      : `${presentOrCalled} présents / ${players.length}`}
+                  </Text>
+                  {!s.cancelled ? (
+                    <View style={styles.barWrap}>
+                      <ProgressBar value={ratio} height={6} />
+                    </View>
+                  ) : null}
+                </Card>
+              </Pressable>
+            );
+          })
         )}
       </ScrollView>
+
+      <Modal
+        visible={matchModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMatchModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Card style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Nouveau match</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Adversaire"
+              placeholderTextColor={colors.textMuted}
+              value={opponent}
+              onChangeText={setOpponent}
+              autoFocus
+              returnKeyType="go"
+              onSubmitEditing={startMatch}
+            />
+            <View style={styles.modalActions}>
+              <Button
+                label="Annuler"
+                variant="secondary"
+                onPress={() => setMatchModalOpen(false)}
+              />
+              <View style={{ width: spacing.sm }} />
+              <Button label="Créer" onPress={startMatch} />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -104,16 +229,47 @@ export function SessionsListScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  filterRow: { flexDirection: 'row', gap: spacing.xs },
+  filterChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: '700' },
+  filterLabelActive: { color: '#FFFFFF' },
+  quickActions: { flexDirection: 'row' },
   row: {},
   rowCancelled: { opacity: 0.6 },
   rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
   },
+  rowTitleBlock: { flex: 1, minWidth: 0, gap: 4 },
+  kindBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  kindBadgeTraining: { backgroundColor: colors.primarySoft },
+  kindBadgeMatch: { backgroundColor: '#FEF3C7' },
+  kindBadgeText: { fontSize: 11, fontWeight: '700' },
+  kindBadgeTextTraining: { color: colors.primary },
+  kindBadgeTextMatch: { color: '#B45309' },
   rowTitle: { ...typography.h3, color: colors.textPrimary },
   rowTitleCancelled: { textDecorationLine: 'line-through' },
   rowPct: { ...typography.bodyBold, color: colors.primary },
+  rowLabel: { ...typography.body, color: colors.textPrimary, marginTop: 2 },
   rowMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
   barWrap: { marginTop: spacing.sm },
   cancelPill: {
@@ -126,5 +282,29 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontWeight: '700',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: { width: '100%', maxWidth: 420 },
+  modalTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.md },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    ...typography.body,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: spacing.lg,
   },
 });

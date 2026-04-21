@@ -1,9 +1,11 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,11 +37,15 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     sessions,
     playerStats,
     globalRatio,
-    activeSessionsCount,
+    activeTrainingsCount,
+    activeMatchesCount,
     createSession,
     syncStatus,
     refreshFromCloud,
   } = useData();
+
+  const [matchModalOpen, setMatchModalOpen] = useState(false);
+  const [opponent, setOpponent] = useState('');
 
   const topPlayers = playerStats.slice(0, 5);
   const lastSession = sessions[0];
@@ -50,14 +56,30 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
       .filter(
         (iso) =>
           !sessions.some(
-            (s) => !s.cancelled && sameDay(s.date, iso),
+            (s) => !s.cancelled && s.kind !== 'match' && sameDay(s.date, iso),
           ),
       )
       .slice(0, 3);
   }, [sessions]);
 
-  const handleNewSession = async () => {
-    const session = await createSession();
+  const startTraining = async () => {
+    const session = await createSession({ kind: 'training' });
+    navigation.navigate('Session', { sessionId: session.id });
+  };
+
+  const openMatchModal = () => {
+    setOpponent('');
+    setMatchModalOpen(true);
+  };
+
+  const startMatch = async () => {
+    const label = opponent.trim();
+    const session = await createSession({
+      kind: 'match',
+      label: label || undefined,
+    });
+    setMatchModalOpen(false);
+    setOpponent('');
     navigation.navigate('Session', { sessionId: session.id });
   };
 
@@ -89,13 +111,13 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             <View style={styles.heroText}>
               <Text style={styles.heroTitle}>Taux de présence</Text>
               <Text style={styles.heroHint}>
-                {activeSessionsCount === 0
-                  ? 'Lancez votre première séance'
-                  : `${activeSessionsCount} séance${activeSessionsCount > 1 ? 's' : ''} prise${activeSessionsCount > 1 ? 's' : ''} en compte`}
+                {activeTrainingsCount === 0
+                  ? 'Lancez votre premier entraînement'
+                  : `${activeTrainingsCount} entraînement${activeTrainingsCount > 1 ? 's' : ''} pris${activeTrainingsCount > 1 ? 'es' : 'e'} en compte`}
               </Text>
               {lastSession ? (
                 <Text style={styles.heroMeta}>
-                  Dernière : {formatDate(lastSession.date)}
+                  Dernière {lastSession.kind === 'match' ? 'convocation' : 'séance'} : {formatDate(lastSession.date)}
                   {lastSession.cancelled ? ' (annulée)' : ''}
                 </Text>
               ) : null}
@@ -104,32 +126,45 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         </Card>
 
         <View style={styles.statsRow}>
-          <StatCard label="Joueurs" value={players.length} accent={colors.primary} />
+          <StatCard
+            label="Entraînements"
+            value={activeTrainingsCount}
+            accent={colors.primary}
+          />
           <View style={{ width: spacing.md }} />
           <StatCard
-            label="Activités"
-            value={activeSessionsCount}
-            hint={
-              sessions.length !== activeSessionsCount
-                ? `${sessions.length - activeSessionsCount} annulée${sessions.length - activeSessionsCount > 1 ? 's' : ''}`
-                : undefined
-            }
+            label="Matchs"
+            value={activeMatchesCount}
             accent={colors.accent}
           />
         </View>
 
         <View style={styles.actions}>
-          <Button
-            label="Nouvelle session (aujourd'hui)"
-            onPress={handleNewSession}
-            icon={<Text style={styles.actionGlyph}>＋</Text>}
-            fullWidth
-          />
+          <View style={styles.actionsRow}>
+            <View style={styles.actionCol}>
+              <Button
+                label="Entraînement"
+                onPress={startTraining}
+                icon={<Text style={styles.actionGlyph}>＋</Text>}
+                fullWidth
+              />
+            </View>
+            <View style={{ width: spacing.sm }} />
+            <View style={styles.actionCol}>
+              <Button
+                label="Match"
+                onPress={openMatchModal}
+                variant="secondary"
+                icon={<Text style={styles.actionGlyphDark}>⚽</Text>}
+                fullWidth
+              />
+            </View>
+          </View>
           <View style={{ height: spacing.sm }} />
           <Button
             label="Voir toutes les séances"
             onPress={() => navigation.navigate('Sessions')}
-            variant="secondary"
+            variant="ghost"
             fullWidth
           />
         </View>
@@ -158,11 +193,11 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
           </Pressable>
         </View>
 
-        {topPlayers.length === 0 || activeSessionsCount === 0 ? (
+        {topPlayers.length === 0 || activeTrainingsCount === 0 ? (
           <Card>
             <EmptyState
               title="Pas encore de stats"
-              description="Démarrez une séance pour commencer à mesurer la présence de vos joueurs."
+              description="Démarrez un entraînement pour commencer à mesurer la présence de vos joueurs."
             />
           </Card>
         ) : (
@@ -195,6 +230,41 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
+
+      <Modal
+        visible={matchModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMatchModalOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Card style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Nouveau match</Text>
+            <Text style={styles.modalHint}>
+              Crée la convocation pour un match à venir.
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Adversaire (ex. Servette FC)"
+              placeholderTextColor={colors.textMuted}
+              value={opponent}
+              onChangeText={setOpponent}
+              autoFocus
+              returnKeyType="go"
+              onSubmitEditing={startMatch}
+            />
+            <View style={styles.modalActions}>
+              <Button
+                label="Annuler"
+                variant="secondary"
+                onPress={() => setMatchModalOpen(false)}
+              />
+              <View style={{ width: spacing.sm }} />
+              <Button label="Créer le match" onPress={startMatch} />
+            </View>
+          </Card>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -217,10 +287,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  heroCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-  },
+  heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
   heroTitle: { ...typography.h3, color: colors.textPrimary },
@@ -231,11 +298,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     marginTop: spacing.md,
   },
-  actions: {
-    paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-  },
-  actionGlyph: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
+  actions: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
+  actionsRow: { flexDirection: 'row' },
+  actionCol: { flex: 1 },
+  actionGlyph: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
+  actionGlyphDark: { color: colors.textPrimary, fontSize: 16 },
   upcomingBlock: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.lg,
@@ -264,9 +331,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { ...typography.h3, color: colors.textPrimary },
   link: { ...typography.bodyBold, color: colors.primary },
-  listCard: {
-    marginHorizontal: spacing.lg,
-  },
+  listCard: { marginHorizontal: spacing.lg },
   playerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -295,5 +360,35 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     minWidth: 44,
     textAlign: 'right',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: colors.overlay,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: { width: '100%', maxWidth: 420 },
+  modalTitle: { ...typography.h3, color: colors.textPrimary },
+  modalHint: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 4,
+    marginBottom: spacing.md,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    ...typography.body,
+    color: colors.textPrimary,
+    backgroundColor: colors.background,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: spacing.lg,
   },
 });

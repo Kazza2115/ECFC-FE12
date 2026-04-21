@@ -29,11 +29,13 @@ export function buildAttendanceCSV(
 
   const header = [
     'Joueur',
-    ...sortedSessions.map((s) =>
-      s.cancelled
-        ? `${formatShortDate(s.date)} (annulée)`
-        : formatShortDate(s.date),
-    ),
+    ...sortedSessions.map((s) => {
+      const prefix = s.kind === 'match' ? '⚽ ' : '';
+      const label = s.label ? ` ${s.label}` : '';
+      const date = formatShortDate(s.date);
+      const suffix = s.cancelled ? ' (annulée)' : '';
+      return `${prefix}${date}${label}${suffix}`;
+    }),
     'Présent',
     'SFC',
     'RC',
@@ -41,16 +43,26 @@ export function buildAttendanceCSV(
     'Absent non exc.',
     'Vacances',
     'Non convoqué',
-    'Activités',
-    'Taux',
+    'Entraînements',
+    'Taux entr.',
+    'Matchs',
+    'Convocations',
+    'Taux conv.',
   ];
   const rows: string[][] = [header];
 
-  const activeSessions = sortedSessions.filter((s) => !s.cancelled);
+  const activeTrainings = sortedSessions.filter(
+    (s) => !s.cancelled && s.kind !== 'match',
+  );
+  const activeMatches = sortedSessions.filter(
+    (s) => !s.cancelled && s.kind === 'match',
+  );
+  const activeTrainingIds = new Set(activeTrainings.map((s) => s.id));
+  const activeMatchIds = new Set(activeMatches.map((s) => s.id));
 
   for (const player of players) {
     const row: string[] = [player.name];
-    const counts: Record<string, number> = {
+    const trainingCounts: Record<string, number> = {
       present: 0,
       sfc: 0,
       return: 0,
@@ -59,6 +71,7 @@ export function buildAttendanceCSV(
       vacation: 0,
       not_called: 0,
     };
+    let matchCallUps = 0;
 
     for (const session of sortedSessions) {
       if (session.cancelled) {
@@ -68,24 +81,39 @@ export function buildAttendanceCSV(
       const record = attendances.find(
         (a) => a.sessionId === session.id && a.playerId === player.id,
       );
-      const status = record?.status ?? 'present';
-      counts[status] = (counts[status] ?? 0) + 1;
+      const status =
+        record?.status ?? (session.kind === 'match' ? 'not_called' : 'present');
+      if (activeTrainingIds.has(session.id)) {
+        trainingCounts[status] = (trainingCounts[status] ?? 0) + 1;
+      } else if (activeMatchIds.has(session.id)) {
+        if (status === 'present' || status === 'sfc' || status === 'return') {
+          matchCallUps += 1;
+        }
+      }
       row.push(CODE[status] ?? '');
     }
 
-    const totalPresent = counts.present + counts.sfc + counts.return;
-    const ratio =
-      activeSessions.length === 0 ? 0 : totalPresent / activeSessions.length;
+    const totalPresent =
+      trainingCounts.present + trainingCounts.sfc + trainingCounts.return;
+    const trainingRatio =
+      activeTrainings.length === 0
+        ? 0
+        : totalPresent / activeTrainings.length;
+    const matchRatio =
+      activeMatches.length === 0 ? 0 : matchCallUps / activeMatches.length;
 
-    row.push(String(counts.present));
-    row.push(String(counts.sfc));
-    row.push(String(counts.return));
-    row.push(String(counts.excused));
-    row.push(String(counts.unexcused));
-    row.push(String(counts.vacation));
-    row.push(String(counts.not_called));
-    row.push(String(activeSessions.length));
-    row.push(`${Math.round(ratio * 100)}%`);
+    row.push(String(trainingCounts.present));
+    row.push(String(trainingCounts.sfc));
+    row.push(String(trainingCounts.return));
+    row.push(String(trainingCounts.excused));
+    row.push(String(trainingCounts.unexcused));
+    row.push(String(trainingCounts.vacation));
+    row.push(String(trainingCounts.not_called));
+    row.push(String(activeTrainings.length));
+    row.push(`${Math.round(trainingRatio * 100)}%`);
+    row.push(String(activeMatches.length));
+    row.push(String(matchCallUps));
+    row.push(`${Math.round(matchRatio * 100)}%`);
     rows.push(row);
   }
 

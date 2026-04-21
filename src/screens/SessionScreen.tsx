@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { confirm } from '@/utils/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '@/components/Avatar';
@@ -15,14 +14,17 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import {
-  PRIMARY_STATUSES,
-  SECONDARY_STATUSES,
   STATUS_META,
+  labelForStatus,
+  primaryStatusesFor,
+  secondaryStatusesFor,
+  shortForStatus,
 } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
-import type { AttendanceStatus, Player } from '@/types';
+import { confirm } from '@/utils/confirm';
+import type { AttendanceStatus, Player, SessionKind } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
@@ -41,14 +43,27 @@ export function SessionScreen({ route, navigation }: Props) {
   } = useData();
 
   const session = sessions.find((s) => s.id === sessionId);
+  const kind: SessionKind = session?.kind ?? 'training';
+  const isMatch = kind === 'match';
   const cancelled = !!session?.cancelled;
+
   const [sheetPlayer, setSheetPlayer] = useState<Player | null>(null);
+
+  const primaryStatuses = primaryStatusesFor(kind);
+  const allStatuses = useMemo(
+    () => [...primaryStatuses, ...secondaryStatusesFor(kind)],
+    [kind, primaryStatuses],
+  );
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: session ? formatDate(session.date) : 'Séance',
+      title: session
+        ? `${isMatch ? '⚽ ' : ''}${formatDate(session.date)}`
+        : isMatch
+        ? 'Match'
+        : 'Séance',
     });
-  }, [navigation, session]);
+  }, [navigation, session, isMatch]);
 
   const presentCount = useMemo(() => {
     return players.filter((p) => {
@@ -77,7 +92,7 @@ export function SessionScreen({ route, navigation }: Props) {
 
   const confirmDelete = async () => {
     const ok = await confirm({
-      title: 'Supprimer la séance ?',
+      title: isMatch ? 'Supprimer le match ?' : 'Supprimer la séance ?',
       message: 'Cette action est définitive.',
       confirmLabel: 'Supprimer',
       destructive: true,
@@ -97,22 +112,40 @@ export function SessionScreen({ route, navigation }: Props) {
     );
   }
 
+  const summaryLabel = cancelled
+    ? isMatch ? 'Match annulé' : 'Séance annulée'
+    : isMatch ? 'Convoqués' : 'Présents';
+
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.topBar}>
+        <View style={styles.summaryRow}>
+          <View style={styles.kindBadge}>
+            <Text style={styles.kindBadgeText}>
+              {isMatch ? '⚽ Match' : '🏋️ Entraînement'}
+            </Text>
+          </View>
+          {session.label ? (
+            <Text style={styles.opponent} numberOfLines={1}>
+              vs {session.label}
+            </Text>
+          ) : null}
+        </View>
+
         <View style={styles.summaryBlock}>
           <Text style={styles.summaryValue}>
             {presentCount}
             <Text style={styles.summaryDivider}>/{players.length}</Text>
           </Text>
-          <Text style={styles.summaryLabel}>
-            {cancelled ? 'Séance annulée' : 'Présents'}
-          </Text>
+          <Text style={styles.summaryLabel}>{summaryLabel}</Text>
         </View>
+
         <View style={styles.cancelBlock}>
           <View>
-            <Text style={styles.cancelTitle}>Entraînement annulé</Text>
-            <Text style={styles.cancelHint}>Exclu du taux de présence</Text>
+            <Text style={styles.cancelTitle}>
+              {isMatch ? 'Match annulé' : 'Entraînement annulé'}
+            </Text>
+            <Text style={styles.cancelHint}>Exclu des statistiques</Text>
           </View>
           <Switch
             value={cancelled}
@@ -131,14 +164,16 @@ export function SessionScreen({ route, navigation }: Props) {
       {!cancelled ? (
         <View style={styles.bulkRow}>
           <Pressable style={styles.bulkChip} onPress={() => markAll('present')}>
-            <Text style={styles.bulkLabel}>Tout présent</Text>
+            <Text style={styles.bulkLabel}>
+              {isMatch ? 'Tout convoquer' : 'Tout présent'}
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.bulkChip, styles.bulkChipGhost]}
-            onPress={() => markAll('unexcused')}
+            onPress={() => markAll(isMatch ? 'not_called' : 'unexcused')}
           >
             <Text style={[styles.bulkLabel, styles.bulkLabelGhost]}>
-              Tout absent
+              {isMatch ? 'Tout non convoquer' : 'Tout absent'}
             </Text>
           </Pressable>
         </View>
@@ -152,16 +187,14 @@ export function SessionScreen({ route, navigation }: Props) {
         renderItem={({ item }) => {
           const status = getStatus(sessionId, item.id);
           const meta = STATUS_META[status];
-          const isSecondary = !meta.primary;
+          const isSecondary = !primaryStatuses.includes(status);
           return (
             <Card
               padded={false}
               style={[
                 styles.row,
                 cancelled && styles.rowDisabled,
-                {
-                  borderLeftColor: meta.color,
-                },
+                { borderLeftColor: meta.color },
               ]}
             >
               <Avatar name={item.name} photoUri={item.photoUri} size={40} />
@@ -176,11 +209,11 @@ export function SessionScreen({ route, navigation }: Props) {
                   {item.name}
                 </Text>
                 <Text style={[styles.rowStatus, { color: meta.color }]}>
-                  {meta.label}
+                  {labelForStatus(kind, status)}
                 </Text>
               </View>
               <View style={styles.segmented}>
-                {PRIMARY_STATUSES.map((key) => {
+                {primaryStatuses.map((key) => {
                   const sMeta = STATUS_META[key];
                   const active = status === key;
                   return (
@@ -222,7 +255,7 @@ export function SessionScreen({ route, navigation }: Props) {
                       },
                     ]}
                   >
-                    {isSecondary ? meta.short : '⋯'}
+                    {isSecondary ? shortForStatus(kind, status) : '⋯'}
                   </Text>
                 </Pressable>
               </View>
@@ -233,7 +266,7 @@ export function SessionScreen({ route, navigation }: Props) {
 
       <View style={styles.footer}>
         <Button
-          label="Supprimer la séance"
+          label={isMatch ? 'Supprimer le match' : 'Supprimer la séance'}
           variant="ghost"
           onPress={confirmDelete}
           fullWidth
@@ -248,7 +281,7 @@ export function SessionScreen({ route, navigation }: Props) {
         onClose={() => setSheetPlayer(null)}
       >
         <View style={styles.sheetGrid}>
-          {[...PRIMARY_STATUSES, ...SECONDARY_STATUSES].map((key) => {
+          {allStatuses.map((key) => {
             const sMeta = STATUS_META[key];
             const active =
               sheetPlayer && getStatus(sessionId, sheetPlayer.id) === key;
@@ -271,7 +304,7 @@ export function SessionScreen({ route, navigation }: Props) {
                 <Text style={[styles.sheetGlyph, { color: sMeta.color }]}>
                   {sMeta.glyph}
                 </Text>
-                <Text style={styles.sheetLabel}>{sMeta.label}</Text>
+                <Text style={styles.sheetLabel}>{labelForStatus(kind, key)}</Text>
               </Pressable>
             );
           })}
@@ -291,9 +324,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
-  summaryBlock: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.sm },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  kindBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  kindBadgeText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
+  opponent: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
+  summaryBlock: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing.sm,
+  },
   summaryValue: { ...typography.number, fontSize: 30, color: colors.textPrimary },
   summaryDivider: { color: colors.textMuted, fontSize: 18, fontWeight: '600' },
   summaryLabel: { ...typography.body, color: colors.textSecondary },
@@ -380,5 +430,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sheetGlyph: { fontSize: 18, fontWeight: '800' },
-  sheetLabel: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
+  sheetLabel: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    flexShrink: 1,
+  },
 });

@@ -1,7 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { db, SEED_PLAYERS } from '@/storage/database';
 import { remote } from '@/storage/remote';
-import { STATUS_META, DEFAULT_STATUS } from '@/constants/statuses';
+import {
+  STATUS_META,
+  defaultStatusFor,
+} from '@/constants/statuses';
 import { uid } from '@/utils/id';
 import { todayISO } from '@/utils/date';
 import type {
@@ -14,6 +17,15 @@ import type {
 } from '@/types';
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline';
+
+export type MatchCallUp = {
+  player: Player;
+  called: number;
+  notCalled: number;
+  absent: number;
+  total: number;
+  ratio: number;
+};
 
 type DataContextValue = {
   loading: boolean;
@@ -32,8 +44,10 @@ type DataContextValue = {
   getStatus: (sessionId: string, playerId: string) => AttendanceStatus;
   getSessionAttendance: (sessionId: string) => Attendance[];
   playerStats: PlayerStats[];
+  matchCallUps: MatchCallUp[];
   globalRatio: number;
-  activeSessionsCount: number;
+  activeTrainingsCount: number;
+  activeMatchesCount: number;
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
   refreshFromCloud: () => Promise<void>;
@@ -41,6 +55,14 @@ type DataContextValue = {
 };
 
 const DataContext = createContext<DataContextValue | null>(null);
+
+function isMatch(s: Session): boolean {
+  return s.kind === 'match';
+}
+
+function isTraining(s: Session): boolean {
+  return s.kind !== 'match';
+}
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -316,25 +338,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [attendances, players]);
 
   const getStatus = useCallback((sessionId: string, playerId: string): AttendanceStatus => {
-    const record = attendances.find((a) => a.sessionId === sessionId && a.playerId === playerId);
-    return record ? record.status : DEFAULT_STATUS;
-  }, [attendances]);
+    const record = attendances.find(
+      (a) => a.sessionId === sessionId && a.playerId === playerId,
+    );
+    if (record) return record.status;
+    const session = sessions.find((s) => s.id === sessionId);
+    return defaultStatusFor(session?.kind);
+  }, [attendances, sessions]);
 
   const getSessionAttendance = useCallback((sessionId: string) => {
     return attendances.filter((a) => a.sessionId === sessionId);
   }, [attendances]);
 
-  const activeSessions = useMemo(
-    () => sessions.filter((s) => !s.cancelled),
+  const activeTrainings = useMemo(
+    () => sessions.filter((s) => isTraining(s) && !s.cancelled),
     [sessions],
   );
-  const activeSessionIds = useMemo(
-    () => new Set(activeSessions.map((s) => s.id)),
-    [activeSessions],
+  const activeMatches = useMemo(
+    () => sessions.filter((s) => isMatch(s) && !s.cancelled),
+    [sessions],
+  );
+  const activeTrainingIds = useMemo(
+    () => new Set(activeTrainings.map((s) => s.id)),
+    [activeTrainings],
+  );
+  const activeMatchIds = useMemo(
+    () => new Set(activeMatches.map((s) => s.id)),
+    [activeMatches],
   );
 
   const playerStats = useMemo<PlayerStats[]>(() => {
-    const totalSessions = activeSessions.length;
+    const totalSessions = activeTrainings.length;
     return players
       .map((player) => {
         const counts = {
@@ -349,12 +383,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
         for (const a of attendances) {
           if (a.playerId !== player.id) continue;
-          if (!activeSessionIds.has(a.sessionId)) continue;
+          if (!activeTrainingIds.has(a.sessionId)) continue;
           counts[a.status] = (counts[a.status] ?? 0) + 1;
         }
 
-        const totalPresent =
-          counts.present + counts.sfc + counts.return;
+        const totalPresent = counts.present + counts.sfc + counts.return;
         const ratio = totalSessions === 0 ? 0 : totalPresent / totalSessions;
 
         return {
@@ -372,18 +405,50 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         };
       })
       .sort((a, b) => b.ratio - a.ratio);
-  }, [players, activeSessions, activeSessionIds, attendances]);
+  }, [players, activeTrainings, activeTrainingIds, attendances]);
+
+  const matchCallUps = useMemo<MatchCallUp[]>(() => {
+    const totalMatches = activeMatches.length;
+    return players
+      .map((player) => {
+        let called = 0;
+        let notCalled = 0;
+        let absent = 0;
+        const seenSessions = new Set<string>();
+        for (const a of attendances) {
+          if (a.playerId !== player.id) continue;
+          if (!activeMatchIds.has(a.sessionId)) continue;
+          seenSessions.add(a.sessionId);
+          if (a.status === 'present' || a.status === 'sfc' || a.status === 'return') called += 1;
+          else if (a.status === 'not_called' || a.status === 'vacation') notCalled += 1;
+          else if (a.status === 'excused' || a.status === 'unexcused') absent += 1;
+        }
+        const untouched = totalMatches - seenSessions.size;
+        notCalled += untouched;
+
+        const ratio = totalMatches === 0 ? 0 : called / totalMatches;
+        return {
+          player,
+          called,
+          notCalled,
+          absent,
+          total: totalMatches,
+          ratio,
+        };
+      })
+      .sort((a, b) => b.called - a.called);
+  }, [players, activeMatches, activeMatchIds, attendances]);
 
   const globalRatio = useMemo(() => {
-    if (activeSessions.length === 0 || players.length === 0) return 0;
-    const possible = activeSessions.length * players.length;
+    if (activeTrainings.length === 0 || players.length === 0) return 0;
+    const possible = activeTrainings.length * players.length;
     let present = 0;
     for (const a of attendances) {
-      if (!activeSessionIds.has(a.sessionId)) continue;
+      if (!activeTrainingIds.has(a.sessionId)) continue;
       if (STATUS_META[a.status]?.countsPresent) present += 1;
     }
     return possible === 0 ? 0 : present / possible;
-  }, [players, activeSessions, activeSessionIds, attendances]);
+  }, [players, activeTrainings, activeTrainingIds, attendances]);
 
   const resetAll = useCallback(async () => {
     await db.resetAll();
@@ -409,8 +474,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     getStatus,
     getSessionAttendance,
     playerStats,
+    matchCallUps,
     globalRatio,
-    activeSessionsCount: activeSessions.length,
+    activeTrainingsCount: activeTrainings.length,
+    activeMatchesCount: activeMatches.length,
     syncStatus,
     lastSyncedAt,
     refreshFromCloud,
