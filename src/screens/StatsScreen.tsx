@@ -365,19 +365,94 @@ function MatchView({
   const matchSummary = useMemo(() => {
     const summary = new Map<
       string,
-      { goals: number; cards: number; events: number }
+      {
+        goals: number;
+        assists: number;
+        keys: number;
+        yellow: number;
+        red: number;
+        totalEvents: number;
+        scorers: Array<{ playerId: string; count: number }>;
+        assisters: Array<{ playerId: string; count: number }>;
+        topMinutes: { playerId: string; ms: number } | null;
+        totalMinutes: number;
+      }
     >();
-    for (const s of matchSessions)
-      summary.set(s.id, { goals: 0, cards: 0, events: 0 });
+
+    const goalsByPlayer = new Map<string, Map<string, number>>();
+    const assistsByPlayer = new Map<string, Map<string, number>>();
+
+    for (const s of matchSessions) {
+      summary.set(s.id, {
+        goals: 0,
+        assists: 0,
+        keys: 0,
+        yellow: 0,
+        red: 0,
+        totalEvents: 0,
+        scorers: [],
+        assisters: [],
+        topMinutes: null,
+        totalMinutes: 0,
+      });
+      goalsByPlayer.set(s.id, new Map());
+      assistsByPlayer.set(s.id, new Map());
+    }
+
     for (const e of matchEvents) {
       const bucket = summary.get(e.sessionId);
       if (!bucket) continue;
-      bucket.events += 1;
-      if (e.type === 'goal') bucket.goals += 1;
-      if (e.type === 'yellow' || e.type === 'red') bucket.cards += 1;
+      bucket.totalEvents += 1;
+      if (e.type === 'goal') {
+        bucket.goals += 1;
+        const map = goalsByPlayer.get(e.sessionId)!;
+        map.set(e.playerId, (map.get(e.playerId) ?? 0) + 1);
+      } else if (e.type === 'assist') {
+        bucket.assists += 1;
+        const map = assistsByPlayer.get(e.sessionId)!;
+        map.set(e.playerId, (map.get(e.playerId) ?? 0) + 1);
+      } else if (e.type === 'key') {
+        bucket.keys += 1;
+      } else if (e.type === 'yellow') {
+        bucket.yellow += 1;
+      } else if (e.type === 'red') {
+        bucket.red += 1;
+      }
     }
+
+    for (const s of matchSessions) {
+      const bucket = summary.get(s.id)!;
+      bucket.scorers = Array.from(goalsByPlayer.get(s.id)!.entries())
+        .map(([playerId, count]) => ({ playerId, count }))
+        .sort((a, b) => b.count - a.count);
+      bucket.assisters = Array.from(assistsByPlayer.get(s.id)!.entries())
+        .map(([playerId, count]) => ({ playerId, count }))
+        .sort((a, b) => b.count - a.count);
+
+      const nowMs = s.endedAt ? new Date(s.endedAt).getTime() : Date.now();
+      let topMs = 0;
+      let topPlayerId: string | null = null;
+      let totalMs = 0;
+      for (const p of players) {
+        const ms = getPlayerPlayMs(p.id, s.id, nowMs);
+        totalMs += ms;
+        if (ms > topMs) {
+          topMs = ms;
+          topPlayerId = p.id;
+        }
+      }
+      bucket.topMinutes = topPlayerId
+        ? { playerId: topPlayerId, ms: topMs }
+        : null;
+      bucket.totalMinutes = totalMs;
+    }
+
     return summary;
-  }, [matchSessions, matchEvents]);
+  }, [matchSessions, matchEvents, players, getPlayerPlayMs]);
+
+  const nameOf = (playerId: string): string => {
+    return players.find((p) => p.id === playerId)?.name ?? '—';
+  };
   const playerTotals = useMemo(() => {
     return players
       .map((p) => ({
@@ -429,50 +504,112 @@ function MatchView({
   return (
     <>
       <Text style={styles.sectionTitle}>Feuilles de match</Text>
-      <Card padded={false} style={styles.listCard}>
-        {matchSessions.map((s, index) => {
+      <View style={styles.matchList}>
+        {matchSessions.map((s) => {
           const bucket = matchSummary.get(s.id);
+          if (!bucket) return null;
+          const state = s.endedAt
+            ? 'terminé'
+            : s.startedAt
+            ? 'en cours'
+            : 'à venir';
+          const hasContent =
+            bucket.totalEvents > 0 || bucket.totalMinutes > 0;
           return (
             <Pressable
               key={s.id}
               onPress={() =>
                 navigation.navigate('MatchSheet', { sessionId: s.id })
               }
-              style={[
-                styles.matchRow,
-                index < matchSessions.length - 1 && styles.rowDivider,
-              ]}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.matchTitle}>
-                  {s.label ? `vs ${s.label}` : 'Match'}
-                </Text>
-                <Text style={styles.matchDate}>
-                  {formatDate(s.date)}
-                  {s.endedAt ? ' · terminé' : s.startedAt ? ' · en cours' : ' · à venir'}
-                </Text>
-              </View>
-              <View style={styles.matchSummaryRow}>
-                {bucket && bucket.goals > 0 ? (
-                  <View style={[styles.matchSummaryPill, { backgroundColor: EVENT_META.goal.bg }]}>
-                    <Text style={{ color: EVENT_META.goal.color, fontWeight: '800', fontSize: 12 }}>
-                      {bucket.goals} {EVENT_META.goal.glyph}
+              <Card style={styles.matchCard}>
+                <View style={styles.matchCardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.matchCardTitle} numberOfLines={1}>
+                      {s.label ? `vs ${s.label}` : 'Match'}
+                    </Text>
+                    <Text style={styles.matchCardSub}>
+                      {formatDate(s.date)} · {state}
                     </Text>
                   </View>
-                ) : null}
-                {bucket && bucket.cards > 0 ? (
-                  <View style={[styles.matchSummaryPill, { backgroundColor: EVENT_META.yellow.bg }]}>
-                    <Text style={{ color: EVENT_META.yellow.color, fontWeight: '800', fontSize: 12 }}>
-                      {bucket.cards} 🟨
-                    </Text>
+                  <View style={styles.matchCardPills}>
+                    {bucket.goals > 0 ? (
+                      <MatchPill
+                        count={bucket.goals}
+                        meta={EVENT_META.goal}
+                      />
+                    ) : null}
+                    {bucket.assists > 0 ? (
+                      <MatchPill
+                        count={bucket.assists}
+                        meta={EVENT_META.assist}
+                      />
+                    ) : null}
+                    {bucket.yellow > 0 ? (
+                      <MatchPill
+                        count={bucket.yellow}
+                        meta={EVENT_META.yellow}
+                      />
+                    ) : null}
+                    {bucket.red > 0 ? (
+                      <MatchPill
+                        count={bucket.red}
+                        meta={EVENT_META.red}
+                      />
+                    ) : null}
                   </View>
-                ) : null}
-                <Text style={styles.matchArrow}>›</Text>
-              </View>
+                </View>
+
+                {hasContent ? (
+                  <View style={styles.matchHighlights}>
+                    {bucket.scorers.length > 0 ? (
+                      <HighlightRow
+                        icon={EVENT_META.goal.glyph}
+                        label="Buteurs"
+                        value={bucket.scorers
+                          .slice(0, 3)
+                          .map(
+                            (x) =>
+                              `${nameOf(x.playerId)}${x.count > 1 ? ` ×${x.count}` : ''}`,
+                          )
+                          .join(' · ')}
+                      />
+                    ) : null}
+                    {bucket.assisters.length > 0 ? (
+                      <HighlightRow
+                        icon={EVENT_META.assist.glyph}
+                        label="Passeurs"
+                        value={bucket.assisters
+                          .slice(0, 3)
+                          .map(
+                            (x) =>
+                              `${nameOf(x.playerId)}${x.count > 1 ? ` ×${x.count}` : ''}`,
+                          )
+                          .join(' · ')}
+                      />
+                    ) : null}
+                    {bucket.topMinutes ? (
+                      <HighlightRow
+                        icon="⏱"
+                        label="Plus long"
+                        value={`${nameOf(bucket.topMinutes.playerId)} · ${formatMinutes(bucket.topMinutes.ms)}`}
+                      />
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text style={styles.matchEmpty}>
+                    {state === 'à venir'
+                      ? 'Match à venir'
+                      : 'Pas encore de stats — passe en Mode Live'}
+                  </Text>
+                )}
+
+                <Text style={styles.matchCta}>Voir la feuille ›</Text>
+              </Card>
             </Pressable>
           );
         })}
-      </Card>
+      </View>
 
       <Card style={styles.hero}>
         <Text style={styles.heroTitle}>Saison</Text>
@@ -644,6 +781,43 @@ function MatchView({
   );
 }
 
+function MatchPill({
+  count,
+  meta,
+}: {
+  count: number;
+  meta: (typeof EVENT_META)[MatchEventType];
+}) {
+  return (
+    <View style={[styles.matchPill, { backgroundColor: meta.bg }]}>
+      <Text style={styles.matchPillGlyph}>{meta.glyph}</Text>
+      <Text style={[styles.matchPillValue, { color: meta.color }]}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+function HighlightRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.highlightRow}>
+      <Text style={styles.highlightIcon}>{icon}</Text>
+      <Text style={styles.highlightLabel}>{label}</Text>
+      <Text style={styles.highlightValue} numberOfLines={2}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function AggregateTile({ type, value }: { type: MatchEventType; value: number }) {
   const meta = EVENT_META[type];
   return (
@@ -777,29 +951,86 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   listCard: {},
-  matchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
+  matchList: {
+    gap: spacing.sm,
   },
-  matchTitle: { ...typography.bodyBold, color: colors.textPrimary, fontSize: 15 },
-  matchDate: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  matchSummaryRow: {
+  matchCard: {
+    gap: spacing.sm,
+  },
+  matchCardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  matchCardTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 17,
+  },
+  matchCardSub: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  matchCardPills: {
+    flexDirection: 'row',
     gap: 6,
+    flexWrap: 'wrap',
   },
-  matchSummaryPill: {
+  matchPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: radius.pill,
   },
-  matchArrow: {
+  matchPillGlyph: { fontSize: 13 },
+  matchPillValue: { fontWeight: '800', fontSize: 13 },
+  matchHighlights: {
+    gap: 6,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  highlightRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  highlightIcon: {
+    fontSize: 16,
+    width: 22,
+    textAlign: 'center',
+  },
+  highlightLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    width: 74,
+    paddingTop: 2,
+  },
+  highlightValue: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    flex: 1,
+    fontSize: 14,
+  },
+  matchEmpty: {
+    ...typography.body,
     color: colors.textMuted,
-    fontSize: 22,
-    marginLeft: 4,
-    marginRight: -4,
+    fontStyle: 'italic',
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  matchCta: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+    alignSelf: 'flex-end',
   },
   playerRow: {
     flexDirection: 'row',
