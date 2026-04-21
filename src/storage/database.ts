@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { kv } from './kv';
 import type { Attendance, Player, Session } from '@/types';
 
 const KEYS = {
@@ -9,7 +9,7 @@ const KEYS = {
 };
 
 async function readJSON<T>(key: string, fallback: T): Promise<T> {
-  const raw = await AsyncStorage.getItem(key);
+  const raw = await kv.getItem(key);
   if (!raw) return fallback;
   try {
     return JSON.parse(raw) as T;
@@ -19,7 +19,7 @@ async function readJSON<T>(key: string, fallback: T): Promise<T> {
 }
 
 async function writeJSON<T>(key: string, value: T): Promise<void> {
-  await AsyncStorage.setItem(key, JSON.stringify(value));
+  await kv.setItem(key, JSON.stringify(value));
 }
 
 export const db = {
@@ -42,14 +42,14 @@ export const db = {
     await writeJSON(KEYS.attendances, attendances);
   },
   async wasSeeded(): Promise<boolean> {
-    const v = await AsyncStorage.getItem(KEYS.seeded);
+    const v = await kv.getItem(KEYS.seeded);
     return v === '1';
   },
   async markSeeded(): Promise<void> {
-    await AsyncStorage.setItem(KEYS.seeded, '1');
+    await kv.setItem(KEYS.seeded, '1');
   },
   async resetAll(): Promise<void> {
-    await AsyncStorage.multiRemove([
+    await kv.multiRemove([
       KEYS.players,
       KEYS.sessions,
       KEYS.attendances,
