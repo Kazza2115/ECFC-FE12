@@ -1,6 +1,5 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -8,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { confirm } from '@/utils/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Avatar } from '@/components/Avatar';
@@ -75,22 +75,16 @@ export function SessionScreen({ route, navigation }: Props) {
     await bulkSetAttendance(sessionId, status);
   };
 
-  const confirmDelete = () => {
-    Alert.alert(
-      'Supprimer la séance ?',
-      'Cette action est définitive.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteSession(sessionId);
-            navigation.goBack();
-          },
-        },
-      ],
-    );
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: 'Supprimer la séance ?',
+      message: 'Cette action est définitive.',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
+    if (!ok) return;
+    await deleteSession(sessionId);
+    navigation.goBack();
   };
 
   if (!session) {

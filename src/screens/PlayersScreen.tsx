@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -9,6 +8,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { confirm } from '@/utils/confirm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
@@ -49,15 +49,15 @@ export function PlayersScreen() {
     setEditingId(null);
   };
 
-  const confirmDelete = (id: string, playerName: string) => {
-    Alert.alert(
-      `Supprimer ${playerName} ?`,
-      'Toutes les présences associées seront effacées.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: () => removePlayer(id) },
-      ],
-    );
+  const confirmDelete = async (id: string, playerName: string) => {
+    const ok = await confirm({
+      title: `Supprimer ${playerName} ?`,
+      message: 'Toutes les présences associées seront effacées.',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
+    if (!ok) return;
+    await removePlayer(id);
   };
 
   return (
