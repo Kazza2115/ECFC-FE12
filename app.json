@@ -24,7 +24,11 @@
       "package": "ch.etoilecarougefc.attendance"
     },
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "single"
+    },
+    "experiments": {
+      "baseUrl": "/ECFC-FE12"
     }
   }
 }
