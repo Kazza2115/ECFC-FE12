@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -35,6 +35,7 @@ export function SessionScreen({ route, navigation }: Props) {
   const {
     players,
     sessions,
+    attendances,
     getStatus,
     setAttendance,
     bulkSetAttendance,
@@ -55,6 +56,21 @@ export function SessionScreen({ route, navigation }: Props) {
     [kind, primaryStatuses],
   );
 
+  const touchedRef = useRef(
+    attendances.some((a) => a.sessionId === sessionId) ||
+      !!session?.cancelled,
+  );
+  const explicitlyDeletedRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (explicitlyDeletedRef.current) return;
+      if (touchedRef.current) return;
+      deleteSession(sessionId).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: session
@@ -73,6 +89,7 @@ export function SessionScreen({ route, navigation }: Props) {
   }, [players, getStatus, sessionId]);
 
   const pickStatus = async (playerId: string, status: AttendanceStatus) => {
+    touchedRef.current = true;
     try {
       await Haptics.selectionAsync();
     } catch {}
@@ -80,6 +97,7 @@ export function SessionScreen({ route, navigation }: Props) {
   };
 
   const markAll = async (status: AttendanceStatus) => {
+    touchedRef.current = true;
     try {
       await Haptics.notificationAsync(
         status === 'present'
@@ -90,6 +108,14 @@ export function SessionScreen({ route, navigation }: Props) {
     await bulkSetAttendance(sessionId, status);
   };
 
+  const handleToggleCancelled = async () => {
+    touchedRef.current = true;
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    await toggleCancelled(sessionId);
+  };
+
   const confirmDelete = async () => {
     const ok = await confirm({
       title: isMatch ? 'Supprimer le match ?' : 'Supprimer la séance ?',
@@ -98,6 +124,7 @@ export function SessionScreen({ route, navigation }: Props) {
       destructive: true,
     });
     if (!ok) return;
+    explicitlyDeletedRef.current = true;
     await deleteSession(sessionId);
     navigation.goBack();
   };
@@ -149,12 +176,7 @@ export function SessionScreen({ route, navigation }: Props) {
           </View>
           <Switch
             value={cancelled}
-            onValueChange={async () => {
-              try {
-                await Haptics.selectionAsync();
-              } catch {}
-              await toggleCancelled(sessionId);
-            }}
+            onValueChange={handleToggleCancelled}
             trackColor={{ false: colors.border, true: colors.primary }}
             thumbColor="#FFFFFF"
           />
