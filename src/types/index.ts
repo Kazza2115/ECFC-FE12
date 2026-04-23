@@ -7,6 +7,11 @@ export type Player = {
 
 export type SessionKind = 'training' | 'match';
 
+export type PauseInterval = {
+  start: string;
+  end?: string;
+};
+
 export type Session = {
   id: string;
   date: string;
@@ -19,6 +24,7 @@ export type Session = {
   lineupPositions?: Record<string, PlayerPosition>;
   formation?: string;
   lineupSlots?: Record<string, string>;
+  pauseIntervals?: PauseInterval[];
   createdAt: string;
 };
 

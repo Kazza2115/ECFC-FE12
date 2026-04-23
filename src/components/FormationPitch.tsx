@@ -219,14 +219,16 @@ function lastName(fullName: string): string {
   return parts[parts.length - 1];
 }
 
-const SLOT_SIZE = 46;
+const SLOT_SIZE = 38;
 
 const styles = StyleSheet.create({
   outer: {
     width: '100%',
+    alignItems: 'center',
   },
   pitchWrap: {
     width: '100%',
+    maxWidth: 260,
     aspectRatio: PITCH_ASPECT,
     borderRadius: radius.lg,
     overflow: 'hidden',
@@ -266,12 +268,13 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '800',
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 10,
     marginTop: 2,
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
     maxWidth: SLOT_SIZE + 24,
+    lineHeight: 12,
   },
   slotPlaceholder: {
     ...typography.caption,

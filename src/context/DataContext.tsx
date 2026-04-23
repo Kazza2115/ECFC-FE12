@@ -62,6 +62,8 @@ type DataContextValue = {
   setFormation: (sessionId: string, formationId: string | undefined) => Promise<void>;
   assignToSlot: (sessionId: string, slotId: string, playerId: string | null) => Promise<void>;
   startMatch: (sessionId: string) => Promise<void>;
+  pauseMatch: (sessionId: string) => Promise<void>;
+  resumeMatch: (sessionId: string) => Promise<void>;
   endMatch: (sessionId: string) => Promise<void>;
   putOnPitch: (sessionId: string, playerId: string, position?: PlayerPosition) => Promise<void>;
   takeOffPitch: (sessionId: string, playerId: string) => Promise<void>;
@@ -734,6 +736,52 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [sessions, stints],
   );
 
+  const pauseMatch = useCallback(
+    async (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const intervals = session.pauseIntervals ?? [];
+      // Already paused
+      if (intervals.length > 0 && !intervals[intervals.length - 1].end) return;
+      const nextIntervals = [...intervals, { start: todayISO() }];
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, pauseIntervals: nextIntervals } : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('pauseMatch', () => remote.upsertSession(changed));
+      }
+    },
+    [sessions],
+  );
+
+  const resumeMatch = useCallback(
+    async (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const intervals = session.pauseIntervals ?? [];
+      if (intervals.length === 0) return;
+      const last = intervals[intervals.length - 1];
+      if (last.end) return; // not currently paused
+      const closed = [
+        ...intervals.slice(0, -1),
+        { ...last, end: todayISO() },
+      ];
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, pauseIntervals: closed } : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('resumeMatch', () => remote.upsertSession(changed));
+      }
+    },
+    [sessions],
+  );
+
   const endMatch = useCallback(
     async (sessionId: string) => {
       const endedAt = todayISO();
@@ -859,11 +907,23 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         if (!sessionId && !activeMatchIds.has(st.sessionId)) continue;
         const start = new Date(st.startAt).getTime();
         const end = st.endAt ? new Date(st.endAt).getTime() : reference;
-        if (end > start) total += end - start;
+        if (end <= start) continue;
+        let duration = end - start;
+        const session = sessions.find((s) => s.id === st.sessionId);
+        const pauses = session?.pauseIntervals ?? [];
+        for (const p of pauses) {
+          const pStart = new Date(p.start).getTime();
+          const pEnd = p.end ? new Date(p.end).getTime() : reference;
+          if (pEnd <= pStart) continue;
+          const overlap =
+            Math.min(pEnd, end) - Math.max(pStart, start);
+          if (overlap > 0) duration -= overlap;
+        }
+        if (duration > 0) total += duration;
       }
       return total;
     },
-    [stints, activeMatchIds],
+    [stints, sessions, activeMatchIds],
   );
 
   const playerStats = useMemo<PlayerStats[]>(() => {
@@ -987,6 +1047,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setFormation,
     assignToSlot,
     startMatch,
+    pauseMatch,
+    resumeMatch,
     endMatch,
     putOnPitch,
     takeOffPitch,

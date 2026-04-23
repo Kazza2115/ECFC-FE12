@@ -66,6 +66,8 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     setFormation,
     assignToSlot,
     startMatch,
+    pauseMatch,
+    resumeMatch,
     endMatch,
     putOnPitch,
     takeOffPitch,
@@ -83,13 +85,16 @@ export function MatchLiveScreen({ route, navigation }: Props) {
 
   const started = !!session?.startedAt;
   const ended = !!session?.endedAt;
-  const matchRunning = started && !ended;
+  const pauseIntervals = session?.pauseIntervals ?? [];
+  const lastPause = pauseIntervals[pauseIntervals.length - 1];
+  const isPaused = !!lastPause && !lastPause.end;
+  const matchRunning = started && !ended && !isPaused;
 
   useEffect(() => {
-    if (!matchRunning) return;
+    if (!started || ended) return;
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
-  }, [matchRunning]);
+  }, [started, ended]);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -247,8 +252,25 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     if (!session?.startedAt) return null;
     const base = new Date(session.startedAt).getTime();
     const end = session.endedAt ? new Date(session.endedAt).getTime() : now;
-    return formatDuration(end - base);
-  }, [session, now]);
+    let pauseMs = 0;
+    for (const p of pauseIntervals) {
+      const pStart = new Date(p.start).getTime();
+      const pEnd = p.end ? new Date(p.end).getTime() : now;
+      if (pEnd > pStart) pauseMs += pEnd - pStart;
+    }
+    return formatDuration(end - base - pauseMs);
+  }, [session, now, pauseIntervals]);
+
+  const handlePauseResume = async () => {
+    try {
+      await Haptics.selectionAsync();
+    } catch {}
+    if (isPaused) {
+      await resumeMatch(sessionId);
+    } else {
+      await pauseMatch(sessionId);
+    }
+  };
 
   if (!session) {
     return (
@@ -270,9 +292,22 @@ export function MatchLiveScreen({ route, navigation }: Props) {
           <View style={styles.clockRow}>
             <View>
               <Text style={styles.clockLabel}>
-                {ended ? 'Match terminé' : started ? 'Match en cours' : 'Match à démarrer'}
+                {ended
+                  ? 'Match terminé'
+                  : isPaused
+                  ? 'Pause'
+                  : started
+                  ? 'Match en cours'
+                  : 'Match à démarrer'}
               </Text>
-              <Text style={styles.clockValue}>{matchClock ?? '0:00'}</Text>
+              <Text
+                style={[
+                  styles.clockValue,
+                  isPaused && { color: colors.warning },
+                ]}
+              >
+                {matchClock ?? '0:00'}
+              </Text>
               <Text style={styles.clockHint}>
                 {convoqués.length} convoqués · {pitchPlayers.length} sur le terrain
               </Text>
@@ -281,7 +316,18 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               {!started ? (
                 <Button label="▶ Démarrer" onPress={handleStartMatch} />
               ) : !ended ? (
-                <Button label="Finir" variant="secondary" onPress={handleEndMatch} />
+                <>
+                  <Button
+                    label={isPaused ? '▶ Reprendre' : '❚❚ Pause'}
+                    variant={isPaused ? 'primary' : 'secondary'}
+                    onPress={handlePauseResume}
+                  />
+                  <Button
+                    label="Finir"
+                    variant="ghost"
+                    onPress={handleEndMatch}
+                  />
+                </>
               ) : null}
             </View>
           </View>
@@ -296,101 +342,170 @@ export function MatchLiveScreen({ route, navigation }: Props) {
           </Card>
         ) : (
           <>
-            {!started && !ended ? (
-              <Card style={styles.formationCard}>
-                <View style={styles.formationHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formationTitle}>Composition</Text>
-                    <Text style={styles.formationHint}>
-                      Tape sur un poste pour placer un joueur
-                    </Text>
-                  </View>
-                  <Pressable
-                    onPress={() => setFormationSheet(true)}
-                    style={styles.formationChip}
-                  >
-                    <Text style={styles.formationChipLabel}>
-                      {formation ? formation.label : 'Aucune'}
-                    </Text>
-                    <Text style={styles.formationChipCaret}>▾</Text>
-                  </Pressable>
+            <Card style={styles.formationCard}>
+              <View style={styles.formationHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formationTitle}>Composition</Text>
+                  <Text style={styles.formationHint}>
+                    {started
+                      ? 'Tape un joueur pour noter un évènement ou un remplacement'
+                      : 'Tape sur un poste pour placer un joueur'}
+                  </Text>
                 </View>
+                <Pressable
+                  onPress={() => setFormationSheet(true)}
+                  disabled={ended}
+                  style={[styles.formationChip, ended && { opacity: 0.4 }]}
+                >
+                  <Text style={styles.formationChipLabel}>
+                    {formation ? formation.label : 'Aucune'}
+                  </Text>
+                  <Text style={styles.formationChipCaret}>▾</Text>
+                </Pressable>
+              </View>
 
-                {formation ? (
-                  <FormationPitch
-                    formation={formation}
-                    lineupSlots={lineupSlots}
-                    players={players}
-                    onSlotPress={(slot) => setSlotSheet({ slot })}
+              {formation ? (
+                <FormationPitch
+                  formation={formation}
+                  lineupSlots={lineupSlots}
+                  players={players}
+                  onSlotPress={(slot) => setSlotSheet({ slot })}
+                  readOnly={ended}
+                />
+              ) : (
+                <View style={styles.noFormation}>
+                  <Text style={styles.noFormationText}>
+                    Choisis une formation pour visualiser ton équipe sur le
+                    terrain.
+                  </Text>
+                  <Button
+                    label="Choisir une formation"
+                    onPress={() => setFormationSheet(true)}
+                    fullWidth
                   />
-                ) : (
-                  <View style={styles.noFormation}>
-                    <Text style={styles.noFormationText}>
-                      Choisis une formation pour visualiser ton équipe sur le
-                      terrain.
-                    </Text>
-                    <Button
-                      label="Choisir une formation"
-                      onPress={() => setFormationSheet(true)}
-                      fullWidth
-                    />
-                  </View>
-                )}
-              </Card>
-            ) : null}
+                </View>
+              )}
+            </Card>
 
-            <Text style={styles.sectionHeader}>
-              {started ? 'Sur le terrain' : 'Titulaires'} ({pitchPlayers.length})
-            </Text>
-            {pitchPlayers.length === 0 ? (
-              <Card>
-                <Text style={styles.muted}>
-                  {started
-                    ? 'Personne sur le terrain. Appuie sur un joueur du banc pour l\'envoyer jouer.'
-                    : 'Marque tes titulaires en appuyant sur les joueurs du banc.'}
+            {formation ? (
+              <>
+                <Text style={styles.sectionHeader}>
+                  Banc ({benchPlayers.length})
                 </Text>
-              </Card>
+                {benchPlayers.length === 0 ? (
+                  <Card>
+                    <Text style={styles.muted}>
+                      Tous les convoqués sont sur le terrain.
+                    </Text>
+                  </Card>
+                ) : (
+                  <Card padded={false} style={styles.benchCard}>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.benchScroll}
+                    >
+                      {benchPlayers.map((player) => {
+                        const totals = getPlayerMatchTotals(
+                          player.id,
+                          sessionId,
+                        );
+                        const hasEvents =
+                          totals.goals +
+                            totals.assists +
+                            totals.key +
+                            totals.yellow +
+                            totals.red >
+                          0;
+                        return (
+                          <View key={player.id} style={styles.benchPlayer}>
+                            <Avatar
+                              name={player.name}
+                              photoUri={player.photoUri}
+                              size={40}
+                            />
+                            <Text
+                              style={styles.benchName}
+                              numberOfLines={1}
+                            >
+                              {player.name.split(/\s+/).pop()}
+                            </Text>
+                            {hasEvents ? (
+                              <Text style={styles.benchEvents}>
+                                {totals.goals > 0
+                                  ? `⚽${totals.goals} `
+                                  : ''}
+                                {totals.yellow > 0
+                                  ? `🟨${totals.yellow} `
+                                  : ''}
+                                {totals.red > 0 ? `🟥${totals.red}` : ''}
+                              </Text>
+                            ) : null}
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </Card>
+                )}
+              </>
             ) : (
-              pitchPlayers.map((player) => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  onPitch
-                  started={started}
-                  ended={ended}
-                  playMs={getPlayerPlayMs(player.id, sessionId, now)}
-                  totals={getPlayerMatchTotals(player.id, sessionId)}
-                  position={currentPosition(player.id)}
-                  onTogglePitch={() => handleTogglePitch(player)}
-                  onChangePosition={() => handleChangePosition(player)}
-                  onEvent={() => setEventSheet({ player })}
-                />
-              ))
-            )}
+              <>
+                <Text style={styles.sectionHeader}>
+                  {started ? 'Sur le terrain' : 'Titulaires'} ({pitchPlayers.length})
+                </Text>
+                {pitchPlayers.length === 0 ? (
+                  <Card>
+                    <Text style={styles.muted}>
+                      {started
+                        ? 'Personne sur le terrain. Appuie sur un joueur du banc pour l\'envoyer jouer.'
+                        : 'Marque tes titulaires en appuyant sur les joueurs du banc.'}
+                    </Text>
+                  </Card>
+                ) : (
+                  pitchPlayers.map((player) => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player}
+                      onPitch
+                      started={started}
+                      ended={ended}
+                      playMs={getPlayerPlayMs(player.id, sessionId, now)}
+                      totals={getPlayerMatchTotals(player.id, sessionId)}
+                      position={currentPosition(player.id)}
+                      onTogglePitch={() => handleTogglePitch(player)}
+                      onChangePosition={() => handleChangePosition(player)}
+                      onEvent={() => setEventSheet({ player })}
+                    />
+                  ))
+                )}
 
-            <Text style={styles.sectionHeader}>
-              Banc ({benchPlayers.length})
-            </Text>
-            {benchPlayers.length === 0 ? (
-              <Card>
-                <Text style={styles.muted}>Tous les convoqués sont sur le terrain.</Text>
-              </Card>
-            ) : (
-              benchPlayers.map((player) => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  onPitch={false}
-                  started={started}
-                  ended={ended}
-                  playMs={getPlayerPlayMs(player.id, sessionId, now)}
-                  totals={getPlayerMatchTotals(player.id, sessionId)}
-                  position={undefined}
-                  onTogglePitch={() => handleTogglePitch(player)}
-                  onChangePosition={() => handleChangePosition(player)}
-                  onEvent={() => setEventSheet({ player })}
-                />
-              ))
+                <Text style={styles.sectionHeader}>
+                  Banc ({benchPlayers.length})
+                </Text>
+                {benchPlayers.length === 0 ? (
+                  <Card>
+                    <Text style={styles.muted}>
+                      Tous les convoqués sont sur le terrain.
+                    </Text>
+                  </Card>
+                ) : (
+                  benchPlayers.map((player) => (
+                    <PlayerCard
+                      key={player.id}
+                      player={player}
+                      onPitch={false}
+                      started={started}
+                      ended={ended}
+                      playMs={getPlayerPlayMs(player.id, sessionId, now)}
+                      totals={getPlayerMatchTotals(player.id, sessionId)}
+                      position={undefined}
+                      onTogglePitch={() => handleTogglePitch(player)}
+                      onChangePosition={() => handleChangePosition(player)}
+                      onEvent={() => setEventSheet({ player })}
+                    />
+                  ))
+                )}
+              </>
             )}
           </>
         )}
@@ -554,124 +669,319 @@ export function MatchLiveScreen({ route, navigation }: Props) {
         }
         onClose={() => setSlotSheet(null)}
       >
-        {slotSheet
-          ? (() => {
-              const slot = slotSheet.slot;
-              const assignedPlayerId = lineupSlots[slot.id];
-              const assignedPlayer = assignedPlayerId
-                ? players.find((p) => p.id === assignedPlayerId)
-                : undefined;
-              const assignedSlotIds = new Set(Object.keys(lineupSlots));
-              const availableBench = convoqués.filter((p) => {
-                if (assignedPlayer && p.id === assignedPlayer.id) return false;
-                const isAssignedElsewhere = Object.entries(lineupSlots).some(
-                  ([sid, pid]) => pid === p.id && sid !== slot.id,
-                );
-                return !isAssignedElsewhere;
-              });
-              // If a player is assigned elsewhere, we still allow picking them
-              // (we'll swap). So build a combined list with a marker.
-              const reassignable = convoqués.filter((p) =>
-                Object.entries(lineupSlots).some(
-                  ([sid, pid]) => pid === p.id && sid !== slot.id,
-                ),
-              );
-
-              return (
-                <View>
-                  {assignedPlayer ? (
-                    <View style={styles.slotAssignedRow}>
-                      <Avatar
-                        name={assignedPlayer.name}
-                        photoUri={assignedPlayer.photoUri}
-                        size={44}
-                      />
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.slotAssignedName}>
-                          {assignedPlayer.name}
-                        </Text>
-                        <Text style={styles.slotAssignedMeta}>
-                          Actuellement {POSITION_META[slot.position].label}
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={async () => {
-                          await assignToSlot(sessionId, slot.id, null);
-                          setSlotSheet(null);
-                        }}
-                        style={styles.slotRemove}
-                      >
-                        <Text style={styles.slotRemoveLabel}>Retirer</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
-
-                  <Text style={styles.slotGroupLabel}>Banc (convoqués)</Text>
-                  {availableBench.length === 0 && reassignable.length === 0 ? (
-                    <Text style={styles.muted}>
-                      Tous les convoqués sont déjà placés. Libère un autre
-                      poste d'abord.
-                    </Text>
-                  ) : (
-                    <View style={styles.slotPlayerGrid}>
-                      {availableBench.map((p) => (
-                        <Pressable
-                          key={p.id}
-                          onPress={async () => {
-                            await assignToSlot(sessionId, slot.id, p.id);
-                            setSlotSheet(null);
-                          }}
-                          style={styles.slotPlayerChip}
-                        >
-                          <Avatar
-                            name={p.name}
-                            photoUri={p.photoUri}
-                            size={32}
-                          />
-                          <Text style={styles.slotPlayerName2}>{p.name}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  )}
-
-                  {reassignable.length > 0 ? (
-                    <>
-                      <Text style={styles.slotGroupLabel}>
-                        Déjà placés (repositionner)
-                      </Text>
-                      <View style={styles.slotPlayerGrid}>
-                        {reassignable.map((p) => (
-                          <Pressable
-                            key={p.id}
-                            onPress={async () => {
-                              await assignToSlot(sessionId, slot.id, p.id);
-                              setSlotSheet(null);
-                            }}
-                            style={[
-                              styles.slotPlayerChip,
-                              styles.slotPlayerChipMoved,
-                            ]}
-                          >
-                            <Avatar
-                              name={p.name}
-                              photoUri={p.photoUri}
-                              size={32}
-                            />
-                            <Text style={styles.slotPlayerName2}>
-                              {p.name}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </>
-                  ) : null}
-                  {assignedSlotIds.size === 0 ? null : null}
-                </View>
-              );
-            })()
-          : null}
+        {slotSheet ? (
+          <SlotSheetBody
+            slot={slotSheet.slot}
+            session={session}
+            started={started}
+            ended={ended}
+            players={players}
+            convoqués={convoqués}
+            lineupSlots={lineupSlots}
+            sessionId={sessionId}
+            assignToSlot={assignToSlot}
+            addMatchEvent={addMatchEvent}
+            putOnPitch={putOnPitch}
+            takeOffPitch={takeOffPitch}
+            getPlayerMatchTotals={getPlayerMatchTotals}
+            onClose={() => setSlotSheet(null)}
+          />
+        ) : null}
       </BottomSheet>
     </SafeAreaView>
+  );
+}
+
+type SlotSheetProps = {
+  slot: FormationSlot;
+  session: ReturnType<typeof useData>['sessions'][number] | undefined;
+  started: boolean;
+  ended: boolean;
+  players: ReturnType<typeof useData>['players'];
+  convoqués: ReturnType<typeof useData>['players'];
+  lineupSlots: Record<string, string>;
+  sessionId: string;
+  assignToSlot: ReturnType<typeof useData>['assignToSlot'];
+  addMatchEvent: ReturnType<typeof useData>['addMatchEvent'];
+  putOnPitch: ReturnType<typeof useData>['putOnPitch'];
+  takeOffPitch: ReturnType<typeof useData>['takeOffPitch'];
+  getPlayerMatchTotals: ReturnType<typeof useData>['getPlayerMatchTotals'];
+  onClose: () => void;
+};
+
+function SlotSheetBody({
+  slot,
+  session,
+  started,
+  ended,
+  players,
+  convoqués,
+  lineupSlots,
+  sessionId,
+  assignToSlot,
+  addMatchEvent,
+  putOnPitch,
+  takeOffPitch,
+  getPlayerMatchTotals,
+  onClose,
+}: SlotSheetProps) {
+  const assignedPlayerId = lineupSlots[slot.id];
+  const assignedPlayer = assignedPlayerId
+    ? players.find((p) => p.id === assignedPlayerId)
+    : undefined;
+
+  const otherSlotIds = Object.entries(lineupSlots)
+    .filter(([sid, pid]) => sid !== slot.id && pid)
+    .map(([, pid]) => pid);
+  const placedIds = new Set(otherSlotIds);
+
+  const availableBench = convoqués.filter(
+    (p) => !placedIds.has(p.id) && p.id !== assignedPlayerId,
+  );
+  const otherPlaced = convoqués.filter((p) => placedIds.has(p.id));
+
+  const eventDo = async (type: MatchEventType) => {
+    if (!assignedPlayer) return;
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {}
+    await addMatchEvent(sessionId, assignedPlayer.id, type);
+    onClose();
+  };
+
+  const substitute = async (newPlayer: Player) => {
+    if (!assignedPlayer) return;
+    // Close the outgoing player's stint if match is running.
+    if (started && !ended) {
+      await takeOffPitch(sessionId, assignedPlayer.id);
+    }
+    await assignToSlot(sessionId, slot.id, newPlayer.id);
+    if (started && !ended) {
+      await putOnPitch(sessionId, newPlayer.id, slot.position);
+    }
+    onClose();
+  };
+
+  const removeFromSlot = async () => {
+    if (!assignedPlayer) return;
+    if (started && !ended) {
+      await takeOffPitch(sessionId, assignedPlayer.id);
+    }
+    await assignToSlot(sessionId, slot.id, null);
+    onClose();
+  };
+
+  const assignNew = async (newPlayer: Player) => {
+    await assignToSlot(sessionId, slot.id, newPlayer.id);
+    if (started && !ended) {
+      await putOnPitch(sessionId, newPlayer.id, slot.position);
+    }
+    onClose();
+  };
+
+  if (!assignedPlayer) {
+    return (
+      <View>
+        <Text style={styles.slotGroupLabel}>Banc (convoqués)</Text>
+        {availableBench.length === 0 && otherPlaced.length === 0 ? (
+          <Text style={styles.muted}>
+            Tous les convoqués sont déjà placés. Libère un autre poste d'abord.
+          </Text>
+        ) : (
+          <View style={styles.slotPlayerGrid}>
+            {availableBench.map((p) => (
+              <Pressable
+                key={p.id}
+                onPress={() => assignNew(p)}
+                style={styles.slotPlayerChip}
+              >
+                <Avatar name={p.name} photoUri={p.photoUri} size={32} />
+                <Text style={styles.slotPlayerName2}>{p.name}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+        {otherPlaced.length > 0 ? (
+          <>
+            <Text style={styles.slotGroupLabel}>
+              Déjà placés (repositionner)
+            </Text>
+            <View style={styles.slotPlayerGrid}>
+              {otherPlaced.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => assignNew(p)}
+                  style={[styles.slotPlayerChip, styles.slotPlayerChipMoved]}
+                >
+                  <Avatar name={p.name} photoUri={p.photoUri} size={32} />
+                  <Text style={styles.slotPlayerName2}>{p.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        ) : null}
+      </View>
+    );
+  }
+
+  const totals = getPlayerMatchTotals(assignedPlayer.id, sessionId);
+
+  return (
+    <View>
+      <View style={styles.slotAssignedRow}>
+        <Avatar
+          name={assignedPlayer.name}
+          photoUri={assignedPlayer.photoUri}
+          size={48}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.slotAssignedName}>{assignedPlayer.name}</Text>
+          <Text style={styles.slotAssignedMeta}>
+            {POSITION_META[slot.position].label}
+          </Text>
+          {totals.goals +
+            totals.assists +
+            totals.key +
+            totals.yellow +
+            totals.red >
+          0 ? (
+            <View style={styles.slotTotalsRow}>
+              {totals.goals > 0 ? (
+                <Text
+                  style={[
+                    styles.slotTotalItem,
+                    { color: EVENT_META.goal.color },
+                  ]}
+                >
+                  {EVENT_META.goal.glyph} {totals.goals}
+                </Text>
+              ) : null}
+              {totals.assists > 0 ? (
+                <Text
+                  style={[
+                    styles.slotTotalItem,
+                    { color: EVENT_META.assist.color },
+                  ]}
+                >
+                  {EVENT_META.assist.glyph} {totals.assists}
+                </Text>
+              ) : null}
+              {totals.key > 0 ? (
+                <Text
+                  style={[
+                    styles.slotTotalItem,
+                    { color: EVENT_META.key.color },
+                  ]}
+                >
+                  {EVENT_META.key.glyph} {totals.key}
+                </Text>
+              ) : null}
+              {totals.yellow > 0 ? (
+                <Text
+                  style={[
+                    styles.slotTotalItem,
+                    { color: EVENT_META.yellow.color },
+                  ]}
+                >
+                  {EVENT_META.yellow.glyph} {totals.yellow}
+                </Text>
+              ) : null}
+              {totals.red > 0 ? (
+                <Text
+                  style={[
+                    styles.slotTotalItem,
+                    { color: EVENT_META.red.color },
+                  ]}
+                >
+                  {EVENT_META.red.glyph} {totals.red}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      {started && !ended ? (
+        <>
+          <Text style={styles.slotGroupLabel}>Évènement</Text>
+          <View style={styles.eventGridBig}>
+            {EVENT_ORDER.map((type) => {
+              const meta = EVENT_META[type];
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => eventDo(type)}
+                  style={[styles.eventBigBtn, { backgroundColor: meta.bg }]}
+                >
+                  <Text style={styles.eventBigGlyph}>{meta.glyph}</Text>
+                  <Text style={[styles.eventBigLabel, { color: meta.color }]}>
+                    {meta.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.slotGroupLabel}>Remplacer par…</Text>
+          {availableBench.length === 0 ? (
+            <Text style={styles.muted}>Aucun remplaçant disponible.</Text>
+          ) : (
+            <View style={styles.slotPlayerGrid}>
+              {availableBench.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => substitute(p)}
+                  style={styles.slotPlayerChip}
+                >
+                  <Avatar name={p.name} photoUri={p.photoUri} size={32} />
+                  <Text style={styles.slotPlayerName2}>{p.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          <Text style={styles.slotGroupLabel}>Remplacer par…</Text>
+          {availableBench.length === 0 && otherPlaced.length === 0 ? (
+            <Text style={styles.muted}>
+              Tous les convoqués sont déjà placés.
+            </Text>
+          ) : (
+            <View style={styles.slotPlayerGrid}>
+              {availableBench.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => assignNew(p)}
+                  style={styles.slotPlayerChip}
+                >
+                  <Avatar name={p.name} photoUri={p.photoUri} size={32} />
+                  <Text style={styles.slotPlayerName2}>{p.name}</Text>
+                </Pressable>
+              ))}
+              {otherPlaced.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => assignNew(p)}
+                  style={[styles.slotPlayerChip, styles.slotPlayerChipMoved]}
+                >
+                  <Avatar name={p.name} photoUri={p.photoUri} size={32} />
+                  <Text style={styles.slotPlayerName2}>{p.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+
+      <View style={styles.slotFooter}>
+        <Pressable onPress={removeFromSlot} style={styles.slotRemoveFull}>
+          <Text style={styles.slotRemoveLabel}>
+            {started && !ended ? '↓ Sortir du terrain (banc)' : 'Retirer du poste'}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -971,6 +1281,70 @@ const styles = StyleSheet.create({
     ...typography.bodyBold,
     color: colors.textPrimary,
     fontSize: 13,
+  },
+  slotTotalsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: 4,
+  },
+  slotTotalItem: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  eventGridBig: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  eventBigBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    width: '48%',
+    flexGrow: 1,
+  },
+  eventBigGlyph: { fontSize: 20 },
+  eventBigLabel: {
+    ...typography.bodyBold,
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  slotFooter: {
+    marginTop: spacing.md,
+  },
+  slotRemoveFull: {
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+  },
+  benchCard: {
+    paddingVertical: 8,
+  },
+  benchScroll: {
+    paddingHorizontal: spacing.md,
+    gap: spacing.md,
+  },
+  benchPlayer: {
+    alignItems: 'center',
+    minWidth: 60,
+    maxWidth: 80,
+  },
+  benchName: {
+    ...typography.caption,
+    color: colors.textPrimary,
+    fontWeight: '700',
+    marginTop: 4,
+    fontSize: 11,
+  },
+  benchEvents: {
+    ...typography.caption,
+    fontSize: 10,
+    marginTop: 2,
+    fontWeight: '700',
   },
   playerCard: {
     borderLeftWidth: 4,
