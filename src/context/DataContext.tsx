@@ -68,6 +68,7 @@ type DataContextValue = {
   startMatch: (sessionId: string) => Promise<void>;
   pauseMatch: (sessionId: string) => Promise<void>;
   resumeMatch: (sessionId: string) => Promise<void>;
+  resetTeam: (sessionId: string) => Promise<void>;
   endMatch: (sessionId: string) => Promise<void>;
   putOnPitch: (sessionId: string, playerId: string, position?: PlayerPosition) => Promise<void>;
   takeOffPitch: (sessionId: string, playerId: string) => Promise<void>;
@@ -777,21 +778,109 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       if (intervals.length === 0) return;
       const last = intervals[intervals.length - 1];
       if (last.end) return; // not currently paused
-      const closed = [
+      const resumeAt = todayISO();
+      const closedIntervals = [
         ...intervals.slice(0, -1),
-        { ...last, end: todayISO() },
+        { ...last, end: resumeAt },
       ];
       const nextSessions = sessions.map((s) =>
-        s.id === sessionId ? { ...s, pauseIntervals: closed } : s,
+        s.id === sessionId ? { ...s, pauseIntervals: closedIntervals } : s,
       );
-      setSessions(nextSessions);
-      await db.saveSessions(nextSessions);
-      const changed = nextSessions.find((s) => s.id === sessionId);
-      if (changed) {
-        await pushSafe('resumeMatch', () => remote.upsertSession(changed));
+
+      // Open stints for any slot occupant that doesn't already have
+      // an open stint for this session. Happens after a team reset
+      // (where we closed everything) or after a regular pause where
+      // the coach changed a few slots while stopped.
+      const occupantIds = new Set(
+        Object.values(session.lineupSlots ?? {}).filter(Boolean),
+      );
+      const openStintPlayerIds = new Set(
+        stints
+          .filter((st) => st.sessionId === sessionId && !st.endAt)
+          .map((st) => st.playerId),
+      );
+      const formation = findFormation(session.formation);
+      const newStints: PlayerStint[] = [];
+      for (const pid of occupantIds) {
+        if (openStintPlayerIds.has(pid)) continue;
+        const slotId = Object.entries(session.lineupSlots ?? {}).find(
+          ([, p]) => p === pid,
+        )?.[0];
+        const slot = formation?.slots.find((s) => s.id === slotId);
+        newStints.push({
+          id: uid(),
+          sessionId,
+          playerId: pid,
+          position: slot?.position,
+          startAt: resumeAt,
+        });
       }
+
+      const nextStints = newStints.length > 0 ? [...stints, ...newStints] : stints;
+
+      setSessions(nextSessions);
+      setStints(nextStints);
+      await Promise.all([
+        db.saveSessions(nextSessions),
+        db.saveStints(nextStints),
+      ]);
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('resumeMatch', async () => {
+        if (changed) await remote.upsertSession(changed);
+        if (newStints.length > 0) await remote.upsertStints(newStints);
+      });
     },
-    [sessions],
+    [sessions, stints],
+  );
+
+  const resetTeam = useCallback(
+    async (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+
+      // Prefer to end stints at the pause start so the paused window
+      // is clean, otherwise close right now.
+      const lastPause = (session.pauseIntervals ?? [])[
+        (session.pauseIntervals ?? []).length - 1
+      ];
+      const endAt =
+        lastPause && !lastPause.end ? lastPause.start : todayISO();
+
+      const openStints = stints.filter(
+        (st) => st.sessionId === sessionId && !st.endAt,
+      );
+      const closedStints = openStints.map((st) => ({ ...st, endAt }));
+      const closedMap = new Map(closedStints.map((s) => [s.id, s]));
+      const nextStints = stints.map((st) => closedMap.get(st.id) ?? st);
+
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              lineupSlots: {},
+              startingLineup: [],
+              lineupPositions: {},
+            }
+          : s,
+      );
+
+      setStints(nextStints);
+      setSessions(nextSessions);
+      await Promise.all([
+        db.saveStints(nextStints),
+        db.saveSessions(nextSessions),
+      ]);
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('resetTeam', async () => {
+        if (closedStints.length > 0) {
+          await remote.upsertStints(closedStints);
+        }
+        if (changed) await remote.upsertSession(changed);
+      });
+    },
+    [sessions, stints],
   );
 
   const endMatch = useCallback(
@@ -1095,6 +1184,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     startMatch,
     pauseMatch,
     resumeMatch,
+    resetTeam,
     endMatch,
     putOnPitch,
     takeOffPitch,

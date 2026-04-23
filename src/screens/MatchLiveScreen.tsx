@@ -74,6 +74,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     startMatch,
     pauseMatch,
     resumeMatch,
+    resetTeam,
     endMatch,
     putOnPitch,
     takeOffPitch,
@@ -281,6 +282,23 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleResetTeam = async () => {
+    const ok = await confirm({
+      title: 'Nouvelle équipe ?',
+      message:
+        'Les joueurs actuellement sur le terrain sortent (temps de jeu fermé au début de la pause). Tu pourras placer une nouvelle équipe, puis appuyer sur Reprendre.',
+      confirmLabel: 'Oui, changer',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Warning,
+      );
+    } catch {}
+    await resetTeam(sessionId);
+  };
+
   if (!session) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -347,6 +365,13 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                     variant={isPaused ? 'primary' : 'secondary'}
                     onPress={handlePauseResume}
                   />
+                  {isPaused ? (
+                    <Button
+                      label="🔄 Nouvelle équipe"
+                      variant="secondary"
+                      onPress={handleResetTeam}
+                    />
+                  ) : null}
                   <Button
                     label="Finir"
                     variant="ghost"
