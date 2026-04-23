@@ -46,3 +46,22 @@ export function confirm(options: Options): Promise<boolean> {
     );
   });
 }
+
+export function notify(title: string, message?: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const text = message ? `${title}\n\n${message}` : title;
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      window.alert(text);
+    }
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    Alert.alert(
+      title,
+      message,
+      [{ text: 'OK', onPress: () => resolve() }],
+      { cancelable: true, onDismiss: () => resolve() },
+    );
+  });
+}
+

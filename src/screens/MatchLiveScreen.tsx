@@ -26,7 +26,7 @@ import { POSITION_META, POSITION_ORDER } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
-import { confirm } from '@/utils/confirm';
+import { confirm, notify } from '@/utils/confirm';
 import type { MatchEventType, Player, PlayerPosition } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -202,15 +202,28 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     });
   };
 
+  const lineupFilledCount = Object.values(lineupSlots).filter(Boolean).length;
+  const lineupRequired = formation ? formation.slots.length : 0;
+  const missingSlots = Math.max(0, lineupRequired - lineupFilledCount);
+
   const handleStartMatch = async () => {
-    const lineup = session?.startingLineup ?? [];
-    if (lineup.length === 0) {
-      const ok = await confirm({
-        title: 'Aucun titulaire désigné',
-        message: 'Tu peux démarrer sans titulaires mais le temps ne comptera que quand tu mets un joueur sur le terrain.',
-        confirmLabel: 'Démarrer',
-      });
-      if (!ok) return;
+    if (formation) {
+      if (missingSlots > 0) {
+        await notify(
+          'Équipe incomplète',
+          `Place les ${missingSlots} joueur${missingSlots > 1 ? 's' : ''} restant${missingSlots > 1 ? 's' : ''} sur le terrain avant de démarrer le match. (${lineupFilledCount}/${lineupRequired} placés)`,
+        );
+        return;
+      }
+    } else {
+      const lineup = session?.startingLineup ?? [];
+      if (lineup.length === 0) {
+        await notify(
+          'Aucune composition',
+          'Choisis une formation et place tes titulaires avant de démarrer le match.',
+        );
+        return;
+      }
     }
     try {
       await Haptics.notificationAsync(
@@ -272,6 +285,13 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   }, [session, now, pauseIntervals]);
 
   const handlePauseResume = async () => {
+    if (isPaused && formation && missingSlots > 0) {
+      await notify(
+        'Équipe incomplète',
+        `Place les ${missingSlots} joueur${missingSlots > 1 ? 's' : ''} restant${missingSlots > 1 ? 's' : ''} sur le terrain avant de reprendre. (${lineupFilledCount}/${lineupRequired} placés)`,
+      );
+      return;
+    }
     try {
       await Haptics.selectionAsync();
     } catch {}
