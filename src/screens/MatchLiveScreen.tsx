@@ -39,6 +39,8 @@ function formatDuration(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+const MAX_OUTFIELD = 10; // 11-a-side = 1 GK + 10 outfield
+
 type EventSheetState = { player: Player } | null;
 type PositionSheetState = {
   player: Player;
@@ -669,8 +671,16 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               1 GK · {customCounts[0]} DEF · {customCounts[1]} MID ·{' '}
               {customCounts[2]} ATT
             </Text>
-            <Text style={styles.customTotal}>
-              Total : {1 + customCounts.reduce((a, b) => a + b, 0)} joueurs
+            <Text
+              style={[
+                styles.customTotal,
+                customCounts.reduce((a, b) => a + b, 0) === MAX_OUTFIELD + 1
+                  ? null
+                  : null,
+              ]}
+            >
+              Total : {1 + customCounts.reduce((a, b) => a + b, 0)} /{' '}
+              {1 + MAX_OUTFIELD} joueurs
             </Text>
 
             {(['Défense', 'Milieu', 'Attaque'] as const).map((label, idx) => (
@@ -694,8 +704,26 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                     style={styles.stepBtn}
                     onPress={() =>
                       setCustomCounts((c) => {
+                        const total = c.reduce((a, b) => a + b, 0);
                         const next = [...c];
+                        if (total < MAX_OUTFIELD) {
+                          // Room available — simple increment.
+                          next[idx] = Math.min(6, c[idx] + 1);
+                          return next;
+                        }
+                        // Cap reached — steal 1 from the fullest other line.
+                        let target = -1;
+                        let targetVal = -1;
+                        for (let i = 0; i < c.length; i++) {
+                          if (i === idx) continue;
+                          if (c[i] > targetVal) {
+                            targetVal = c[i];
+                            target = i;
+                          }
+                        }
+                        if (target < 0 || c[target] <= 0) return c;
                         next[idx] = Math.min(6, c[idx] + 1);
+                        next[target] = c[target] - 1;
                         return next;
                       })
                     }
