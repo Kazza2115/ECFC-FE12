@@ -6,6 +6,7 @@ import type {
   Player,
   PlayerPosition,
   PlayerStint,
+  SavedFormation,
   Session,
 } from '@/types';
 
@@ -62,6 +63,14 @@ type DbStint = {
   start_at: string;
   end_at: string | null;
   team_id: string;
+};
+
+type DbSavedFormation = {
+  id: string;
+  name: string;
+  counts: number[];
+  team_id: string;
+  created_at: string;
 };
 
 function now(): string {
@@ -193,34 +202,57 @@ function fromDbStint(row: DbStint): PlayerStint {
   };
 }
 
+function toDbSavedFormation(f: SavedFormation): DbSavedFormation {
+  return {
+    id: f.id,
+    name: f.name,
+    counts: f.counts,
+    team_id: TEAM_ID,
+    created_at: f.createdAt,
+  };
+}
+
+function fromDbSavedFormation(row: DbSavedFormation): SavedFormation {
+  return {
+    id: row.id,
+    name: row.name,
+    counts: Array.isArray(row.counts) ? row.counts : [],
+    createdAt: row.created_at,
+  };
+}
+
 export type RemoteSnapshot = {
   players: Player[];
   sessions: Session[];
   attendances: Attendance[];
   matchEvents: MatchEvent[];
   stints: PlayerStint[];
+  savedFormations: SavedFormation[];
 };
 
 export const remote = {
   async fetchAll(): Promise<RemoteSnapshot> {
-    const [pRes, sRes, aRes, eRes, stRes] = await Promise.all([
+    const [pRes, sRes, aRes, eRes, stRes, sfRes] = await Promise.all([
       supabase.from('ecfc_players').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_sessions').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_attendances').select('*'),
       supabase.from('ecfc_match_events').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_player_stints').select('*').eq('team_id', TEAM_ID),
+      supabase.from('ecfc_saved_formations').select('*').eq('team_id', TEAM_ID),
     ]);
     if (pRes.error) throw pRes.error;
     if (sRes.error) throw sRes.error;
     if (aRes.error) throw aRes.error;
     if (eRes.error && eRes.error.code !== 'PGRST205') throw eRes.error;
     if (stRes.error && stRes.error.code !== 'PGRST205') throw stRes.error;
+    if (sfRes.error && sfRes.error.code !== 'PGRST205') throw sfRes.error;
     return {
       players: (pRes.data ?? []).map(fromDbPlayer),
       sessions: (sRes.data ?? []).map(fromDbSession),
       attendances: (aRes.data ?? []).map(fromDbAttendance),
       matchEvents: (eRes.data ?? []).map(fromDbMatchEvent),
       stints: (stRes.data ?? []).map(fromDbStint),
+      savedFormations: (sfRes.data ?? []).map(fromDbSavedFormation),
     };
   },
   async upsertPlayer(p: Player): Promise<void> {
@@ -335,6 +367,19 @@ export const remote = {
       .from('ecfc_player_stints')
       .delete()
       .eq('player_id', playerId);
+    if (error) throw error;
+  },
+  async upsertSavedFormation(f: SavedFormation): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_saved_formations')
+      .upsert(toDbSavedFormation(f));
+    if (error) throw error;
+  },
+  async deleteSavedFormation(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_saved_formations')
+      .delete()
+      .eq('id', id);
     if (error) throw error;
   },
   async uploadPhoto(playerId: string, dataUriOrLocalUri: string): Promise<string> {

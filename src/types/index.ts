@@ -92,3 +92,10 @@ export type PlayerStint = {
   startAt: string;
   endAt?: string;
 };
+
+export type SavedFormation = {
+  id: string;
+  name: string;
+  counts: number[];
+  createdAt: string;
+};

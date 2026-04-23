@@ -18,6 +18,7 @@ import type {
   PlayerPosition,
   PlayerStats,
   PlayerStint,
+  SavedFormation,
   Session,
   SessionKind,
 } from '@/types';
@@ -61,6 +62,9 @@ type DataContextValue = {
   removeFromLineup: (sessionId: string, playerId: string) => Promise<void>;
   setFormation: (sessionId: string, formationId: string | undefined) => Promise<void>;
   assignToSlot: (sessionId: string, slotId: string, playerId: string | null) => Promise<void>;
+  savedFormations: SavedFormation[];
+  saveFormation: (name: string, counts: number[]) => Promise<SavedFormation>;
+  deleteSavedFormation: (id: string) => Promise<void>;
   startMatch: (sessionId: string) => Promise<void>;
   pauseMatch: (sessionId: string) => Promise<void>;
   resumeMatch: (sessionId: string) => Promise<void>;
@@ -98,6 +102,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [attendances, setAttendances] = useState<Attendance[]>([]);
   const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
   const [stints, setStints] = useState<PlayerStint[]>([]);
+  const [savedFormations, setSavedFormations] = useState<SavedFormation[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
@@ -120,6 +125,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         cachedAttendances,
         cachedEvents,
         cachedStints,
+        cachedSavedFormations,
         seeded,
       ] = await Promise.all([
         db.getPlayers(),
@@ -127,6 +133,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         db.getAttendances(),
         db.getMatchEvents(),
         db.getStints(),
+        db.getSavedFormations(),
         db.wasSeeded(),
       ]);
 
@@ -135,6 +142,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setAttendances(migrateAttendances(cachedAttendances));
       setMatchEvents(cachedEvents);
       setStints(cachedStints);
+      setSavedFormations(cachedSavedFormations);
       setLoading(false);
 
       setSyncStatus('syncing');
@@ -151,12 +159,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           setAttendances(snap.attendances);
           setMatchEvents(snap.matchEvents);
           setStints(snap.stints);
+          setSavedFormations(snap.savedFormations);
           await Promise.all([
             db.savePlayers(snap.players),
             db.saveSessions(snap.sessions),
             db.saveAttendances(snap.attendances),
             db.saveMatchEvents(snap.matchEvents),
             db.saveStints(snap.stints),
+            db.saveSavedFormations(snap.savedFormations),
             db.markSeeded(),
           ]);
         } else if (cachedPlayers.length === 0 && !seeded) {
@@ -208,12 +218,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setAttendances(snap.attendances);
       setMatchEvents(snap.matchEvents);
       setStints(snap.stints);
+      setSavedFormations(snap.savedFormations);
       await Promise.all([
         db.savePlayers(snap.players),
         db.saveSessions(snap.sessions),
         db.saveAttendances(snap.attendances),
         db.saveMatchEvents(snap.matchEvents),
         db.saveStints(snap.stints),
+        db.saveSavedFormations(snap.savedFormations),
       ]);
       markSynced();
     } catch (err) {
@@ -1009,6 +1021,36 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     return possible === 0 ? 0 : present / possible;
   }, [players, activeTrainings, activeTrainingIds, attendances]);
 
+  const saveFormation = useCallback(
+    async (name: string, counts: number[]) => {
+      const trimmed = name.trim();
+      const item: SavedFormation = {
+        id: uid(),
+        name: trimmed.length > 0 ? trimmed : counts.join('-'),
+        counts,
+        createdAt: todayISO(),
+      };
+      const next = [...savedFormations, item];
+      setSavedFormations(next);
+      await db.saveSavedFormations(next);
+      await pushSafe('saveFormation', () => remote.upsertSavedFormation(item));
+      return item;
+    },
+    [savedFormations],
+  );
+
+  const deleteSavedFormation = useCallback(
+    async (id: string) => {
+      const next = savedFormations.filter((f) => f.id !== id);
+      setSavedFormations(next);
+      await db.saveSavedFormations(next);
+      await pushSafe('deleteSavedFormation', () =>
+        remote.deleteSavedFormation(id),
+      );
+    },
+    [savedFormations],
+  );
+
   const resetAll = useCallback(async () => {
     await db.resetAll();
     setPlayers([]);
@@ -1016,6 +1058,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setAttendances([]);
     setMatchEvents([]);
     setStints([]);
+    setSavedFormations([]);
   }, []);
 
   const value: DataContextValue = {
@@ -1046,6 +1089,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     removeFromLineup,
     setFormation,
     assignToSlot,
+    savedFormations,
+    saveFormation,
+    deleteSavedFormation,
     startMatch,
     pauseMatch,
     resumeMatch,

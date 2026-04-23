@@ -4,6 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -67,6 +68,9 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     removeFromLineup,
     setFormation,
     assignToSlot,
+    savedFormations,
+    saveFormation,
+    deleteSavedFormation,
     startMatch,
     pauseMatch,
     resumeMatch,
@@ -83,6 +87,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   const [formationSheet, setFormationSheet] = useState<FormationSheetOpen>(false);
   const [customMode, setCustomMode] = useState<boolean>(false);
   const [customCounts, setCustomCounts] = useState<number[]>([4, 3, 3]);
+  const [saveName, setSaveName] = useState<string>('');
 
   const formation = findFormation(session?.formation);
   const lineupSlots = session?.lineupSlots ?? {};
@@ -647,6 +652,64 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                 );
               })}
             </View>
+
+            {savedFormations.length > 0 ? (
+              <>
+                <Text style={styles.savedFormationsLabel}>
+                  Mes compositions
+                </Text>
+                <View style={styles.savedFormationList}>
+                  {savedFormations.map((sf) => {
+                    const id = sf.counts.join('-');
+                    const active = session?.formation === id;
+                    return (
+                      <View
+                        key={sf.id}
+                        style={[
+                          styles.savedFormationRow,
+                          active && styles.savedFormationRowActive,
+                        ]}
+                      >
+                        <Pressable
+                          style={styles.savedFormationMain}
+                          onPress={async () => {
+                            await setFormation(sessionId, id);
+                            setFormationSheet(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.savedFormationName,
+                              active && { color: colors.primary },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {sf.name}
+                          </Text>
+                          <Text style={styles.savedFormationMeta}>
+                            {id} · 1 GK + {sf.counts.reduce((a, b) => a + b, 0)} joueurs
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={async () => {
+                            const ok = await confirm({
+                              title: `Supprimer "${sf.name}" ?`,
+                              confirmLabel: 'Supprimer',
+                              destructive: true,
+                            });
+                            if (ok) await deleteSavedFormation(sf.id);
+                          }}
+                          style={styles.savedFormationDelete}
+                        >
+                          <Text style={styles.savedFormationDeleteLabel}>×</Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            ) : null}
+
             <Pressable
               onPress={() => {
                 const seed =
@@ -654,6 +717,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                     ? session.formation.split('-').map(Number)
                     : [4, 3, 3];
                 setCustomCounts(seed.length === 3 ? seed : [4, 3, 3]);
+                setSaveName('');
                 setCustomMode(true);
               }}
               style={styles.customLink}
@@ -733,6 +797,29 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                 </View>
               </View>
             ))}
+
+            <View style={styles.savedRow}>
+              <TextInput
+                style={styles.savedInput}
+                placeholder={`Nom (ex. "${customCounts.join('-')} Pressing")`}
+                placeholderTextColor={colors.textMuted}
+                value={saveName}
+                onChangeText={setSaveName}
+                returnKeyType="done"
+              />
+              <Pressable
+                onPress={async () => {
+                  await saveFormation(saveName, customCounts);
+                  setSaveName('');
+                }}
+                style={styles.savedSaveBtn}
+              >
+                <Text style={styles.savedSaveLabel}>💾</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.savedHint}>
+              Enregistre ce schéma pour le réutiliser sur d'autres matchs.
+            </Text>
 
             <View style={styles.customActions}>
               <Button
@@ -1317,6 +1404,84 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderStyle: 'dashed',
+  },
+  savedFormationsLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  savedFormationList: { gap: spacing.sm },
+  savedFormationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  savedFormationRowActive: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  savedFormationMain: { flex: 1, padding: spacing.md },
+  savedFormationName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  savedFormationMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  savedFormationDelete: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    borderRadius: 18,
+    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+  },
+  savedFormationDeleteLabel: {
+    color: colors.danger,
+    fontWeight: '800',
+    fontSize: 22,
+    lineHeight: 22,
+  },
+  savedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  savedInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    ...typography.body,
+    color: colors.textPrimary,
+  },
+  savedSaveBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  savedSaveLabel: { fontSize: 18 },
+  savedHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 4,
   },
   customLinkLabel: {
     ...typography.bodyBold,
