@@ -304,7 +304,9 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                 {ended
                   ? 'Match terminé'
                   : isPaused
-                  ? 'Pause'
+                  ? pauseIntervals.length === 1
+                    ? 'Mi-temps'
+                    : `Pause ${pauseIntervals.length - 1}`
                   : started
                   ? 'Match en cours'
                   : 'Match à démarrer'}
@@ -317,9 +319,17 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               >
                 {matchClock ?? '0:00'}
               </Text>
-              <Text style={styles.clockHint}>
-                {convoqués.length} convoqués · {pitchPlayers.length} sur le terrain
-              </Text>
+              {isPaused && lastPause ? (
+                <Text style={[styles.clockHint, { color: colors.warning }]}>
+                  En pause depuis {formatDuration(
+                    now - new Date(lastPause.start).getTime(),
+                  )}
+                </Text>
+              ) : (
+                <Text style={styles.clockHint}>
+                  {convoqués.length} convoqués · {pitchPlayers.length} sur le terrain
+                </Text>
+              )}
             </View>
             <View style={styles.clockActions}>
               {!started ? (
@@ -327,7 +337,13 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               ) : !ended ? (
                 <>
                   <Button
-                    label={isPaused ? '▶ Reprendre' : '❚❚ Pause'}
+                    label={
+                      isPaused
+                        ? '▶ Reprendre'
+                        : pauseIntervals.length === 0
+                        ? '❚❚ Mi-temps'
+                        : '❚❚ Pause'
+                    }
                     variant={isPaused ? 'primary' : 'secondary'}
                     onPress={handlePauseResume}
                   />
