@@ -79,6 +79,8 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   const [positionSheet, setPositionSheet] = useState<PositionSheetState>(null);
   const [slotSheet, setSlotSheet] = useState<SlotSheetState>(null);
   const [formationSheet, setFormationSheet] = useState<FormationSheetOpen>(false);
+  const [customMode, setCustomMode] = useState<boolean>(false);
+  const [customCounts, setCustomCounts] = useState<number[]>([4, 3, 3]);
 
   const formation = findFormation(session?.formation);
   const lineupSlots = session?.lineupSlots ?? {};
@@ -388,6 +390,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
             </Card>
 
             {formation ? (
+              started && !ended ? (
               <>
                 <Text style={styles.sectionHeader}>
                   Banc ({benchPlayers.length})
@@ -448,6 +451,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                   </Card>
                 )}
               </>
+              ) : null
             ) : (
               <>
                 <Text style={styles.sectionHeader}>
@@ -610,54 +614,120 @@ export function MatchLiveScreen({ route, navigation }: Props) {
       <BottomSheet
         visible={formationSheet}
         title="Choisir une formation"
-        onClose={() => setFormationSheet(false)}
+        onClose={() => {
+          setFormationSheet(false);
+          setCustomMode(false);
+        }}
       >
-        <View style={styles.formationGrid}>
-          {FORMATIONS.map((f) => {
-            const active = session?.formation === f.id;
-            return (
-              <Pressable
-                key={f.id}
+        {!customMode ? (
+          <>
+            <View style={styles.formationGrid}>
+              {FORMATIONS.map((f) => {
+                const active = session?.formation === f.id;
+                return (
+                  <Pressable
+                    key={f.id}
+                    onPress={async () => {
+                      await setFormation(sessionId, f.id);
+                      setFormationSheet(false);
+                    }}
+                    style={[
+                      styles.formationOption,
+                      active && styles.formationOptionActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.formationOptionLabel,
+                        active && styles.formationOptionLabelActive,
+                      ]}
+                    >
+                      {f.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={() => {
+                const seed =
+                  session?.formation && /^\d+(-\d+){1,3}$/.test(session.formation)
+                    ? session.formation.split('-').map(Number)
+                    : [4, 3, 3];
+                setCustomCounts(seed.length === 3 ? seed : [4, 3, 3]);
+                setCustomMode(true);
+              }}
+              style={styles.customLink}
+            >
+              <Text style={styles.customLinkLabel}>＋ Personnalisée</Text>
+              <Text style={styles.customLinkSub}>
+                Choisis le nombre de défenseurs / milieux / attaquants
+              </Text>
+            </Pressable>
+          </>
+        ) : (
+          <View style={styles.customWrap}>
+            <Text style={styles.customTitle}>Composition personnalisée</Text>
+            <Text style={styles.customSub}>
+              1 GK · {customCounts[0]} DEF · {customCounts[1]} MID ·{' '}
+              {customCounts[2]} ATT
+            </Text>
+            <Text style={styles.customTotal}>
+              Total : {1 + customCounts.reduce((a, b) => a + b, 0)} joueurs
+            </Text>
+
+            {(['Défense', 'Milieu', 'Attaque'] as const).map((label, idx) => (
+              <View key={label} style={styles.stepperRow}>
+                <Text style={styles.stepperLabel}>{label}</Text>
+                <View style={styles.stepper}>
+                  <Pressable
+                    style={styles.stepBtn}
+                    onPress={() =>
+                      setCustomCounts((c) => {
+                        const next = [...c];
+                        next[idx] = Math.max(0, c[idx] - 1);
+                        return next;
+                      })
+                    }
+                  >
+                    <Text style={styles.stepBtnLabel}>−</Text>
+                  </Pressable>
+                  <Text style={styles.stepValue}>{customCounts[idx]}</Text>
+                  <Pressable
+                    style={styles.stepBtn}
+                    onPress={() =>
+                      setCustomCounts((c) => {
+                        const next = [...c];
+                        next[idx] = Math.min(6, c[idx] + 1);
+                        return next;
+                      })
+                    }
+                  >
+                    <Text style={styles.stepBtnLabel}>+</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.customActions}>
+              <Button
+                label="Retour"
+                variant="secondary"
+                onPress={() => setCustomMode(false)}
+              />
+              <View style={{ width: spacing.sm }} />
+              <Button
+                label="Appliquer"
                 onPress={async () => {
-                  await setFormation(sessionId, f.id);
+                  const id = customCounts.join('-');
+                  await setFormation(sessionId, id);
+                  setCustomMode(false);
                   setFormationSheet(false);
                 }}
-                style={[
-                  styles.formationOption,
-                  active && styles.formationOptionActive,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.formationOptionLabel,
-                    active && styles.formationOptionLabelActive,
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-          <Pressable
-            onPress={async () => {
-              await setFormation(sessionId, undefined);
-              setFormationSheet(false);
-            }}
-            style={[
-              styles.formationOption,
-              !session?.formation && styles.formationOptionActive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.formationOptionLabel,
-                !session?.formation && styles.formationOptionLabelActive,
-              ]}
-            >
-              Aucune
-            </Text>
-          </Pressable>
-        </View>
+              />
+            </View>
+          </View>
+        )}
       </BottomSheet>
 
       <BottomSheet
@@ -1213,6 +1283,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   formationOptionLabelActive: { color: colors.primary },
+  customLink: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+  },
+  customLinkLabel: {
+    ...typography.bodyBold,
+    color: colors.primary,
+    fontSize: 15,
+  },
+  customLinkSub: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  customWrap: { gap: spacing.md },
+  customTitle: { ...typography.h3, color: colors.textPrimary },
+  customSub: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  customTotal: {
+    ...typography.bodyBold,
+    color: colors.primary,
+    fontSize: 16,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  stepperLabel: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  stepBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBtnLabel: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 20,
+    lineHeight: 22,
+  },
+  stepValue: {
+    ...typography.h2,
+    color: colors.textPrimary,
+    minWidth: 24,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  customActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: spacing.sm,
+  },
   noFormation: {
     alignItems: 'center',
     padding: spacing.md,
