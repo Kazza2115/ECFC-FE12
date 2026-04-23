@@ -389,8 +389,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               )}
             </Card>
 
-            {formation ? (
-              started && !ended ? (
+            {!started ? null : formation ? (
               <>
                 <Text style={styles.sectionHeader}>
                   Banc ({benchPlayers.length})
@@ -451,18 +450,16 @@ export function MatchLiveScreen({ route, navigation }: Props) {
                   </Card>
                 )}
               </>
-              ) : null
             ) : (
               <>
                 <Text style={styles.sectionHeader}>
-                  {started ? 'Sur le terrain' : 'Titulaires'} ({pitchPlayers.length})
+                  Sur le terrain ({pitchPlayers.length})
                 </Text>
                 {pitchPlayers.length === 0 ? (
                   <Card>
                     <Text style={styles.muted}>
-                      {started
-                        ? 'Personne sur le terrain. Appuie sur un joueur du banc pour l\'envoyer jouer.'
-                        : 'Marque tes titulaires en appuyant sur les joueurs du banc.'}
+                      Personne sur le terrain. Appuie sur un joueur du banc
+                      pour l'envoyer jouer.
                     </Text>
                   </Card>
                 ) : (
