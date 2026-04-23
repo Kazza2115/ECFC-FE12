@@ -28,6 +28,8 @@ type DbSession = {
   ended_at: string | null;
   starting_lineup: string[] | null;
   lineup_positions: Record<string, string> | null;
+  formation: string | null;
+  lineup_slots: Record<string, string> | null;
   team_id: string;
   created_at: string;
   updated_at: string;
@@ -97,6 +99,8 @@ function toDbSession(s: Session): DbSession {
     starting_lineup: s.startingLineup ?? null,
     lineup_positions:
       (s.lineupPositions as Record<string, string>) ?? null,
+    formation: s.formation ?? null,
+    lineup_slots: s.lineupSlots ?? null,
     team_id: TEAM_ID,
     created_at: s.createdAt,
     updated_at: now(),
@@ -115,6 +119,8 @@ function fromDbSession(row: DbSession): Session {
     startingLineup: row.starting_lineup ?? undefined,
     lineupPositions:
       (row.lineup_positions as Session['lineupPositions']) ?? undefined,
+    formation: row.formation ?? undefined,
+    lineupSlots: row.lineup_slots ?? undefined,
     createdAt: row.created_at,
   };
 }

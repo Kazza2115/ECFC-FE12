@@ -13,7 +13,14 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { FormationPitch } from '@/components/FormationPitch';
 import { EVENT_META, EVENT_ORDER } from '@/constants/events';
+import {
+  DEFAULT_FORMATION_ID,
+  FORMATIONS,
+  findFormation,
+  type FormationSlot,
+} from '@/constants/formations';
 import { POSITION_META, POSITION_ORDER } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -38,6 +45,8 @@ type PositionSheetState = {
   mode: 'lineup' | 'substitute';
   onSelect: (pos: PlayerPosition | undefined) => void;
 } | null;
+type SlotSheetState = { slot: FormationSlot } | null;
+type FormationSheetOpen = boolean;
 
 export function MatchLiveScreen({ route, navigation }: Props) {
   const { sessionId } = route.params;
@@ -54,6 +63,8 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     getPlayerPlayMs,
     setLineupPosition,
     removeFromLineup,
+    setFormation,
+    assignToSlot,
     startMatch,
     endMatch,
     putOnPitch,
@@ -64,6 +75,11 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   const [now, setNow] = useState<number>(Date.now());
   const [eventSheet, setEventSheet] = useState<EventSheetState>(null);
   const [positionSheet, setPositionSheet] = useState<PositionSheetState>(null);
+  const [slotSheet, setSlotSheet] = useState<SlotSheetState>(null);
+  const [formationSheet, setFormationSheet] = useState<FormationSheetOpen>(false);
+
+  const formation = findFormation(session?.formation);
+  const lineupSlots = session?.lineupSlots ?? {};
 
   const started = !!session?.startedAt;
   const ended = !!session?.endedAt;
@@ -280,6 +296,49 @@ export function MatchLiveScreen({ route, navigation }: Props) {
           </Card>
         ) : (
           <>
+            {!started && !ended ? (
+              <Card style={styles.formationCard}>
+                <View style={styles.formationHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formationTitle}>Composition</Text>
+                    <Text style={styles.formationHint}>
+                      Tape sur un poste pour placer un joueur
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => setFormationSheet(true)}
+                    style={styles.formationChip}
+                  >
+                    <Text style={styles.formationChipLabel}>
+                      {formation ? formation.label : 'Aucune'}
+                    </Text>
+                    <Text style={styles.formationChipCaret}>▾</Text>
+                  </Pressable>
+                </View>
+
+                {formation ? (
+                  <FormationPitch
+                    formation={formation}
+                    lineupSlots={lineupSlots}
+                    players={players}
+                    onSlotPress={(slot) => setSlotSheet({ slot })}
+                  />
+                ) : (
+                  <View style={styles.noFormation}>
+                    <Text style={styles.noFormationText}>
+                      Choisis une formation pour visualiser ton équipe sur le
+                      terrain.
+                    </Text>
+                    <Button
+                      label="Choisir une formation"
+                      onPress={() => setFormationSheet(true)}
+                      fullWidth
+                    />
+                  </View>
+                )}
+              </Card>
+            ) : null}
+
             <Text style={styles.sectionHeader}>
               {started ? 'Sur le terrain' : 'Titulaires'} ({pitchPlayers.length})
             </Text>
@@ -431,6 +490,186 @@ export function MatchLiveScreen({ route, navigation }: Props) {
         >
           <Text style={styles.positionSkipLabel}>Sans poste</Text>
         </Pressable>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={formationSheet}
+        title="Choisir une formation"
+        onClose={() => setFormationSheet(false)}
+      >
+        <View style={styles.formationGrid}>
+          {FORMATIONS.map((f) => {
+            const active = session?.formation === f.id;
+            return (
+              <Pressable
+                key={f.id}
+                onPress={async () => {
+                  await setFormation(sessionId, f.id);
+                  setFormationSheet(false);
+                }}
+                style={[
+                  styles.formationOption,
+                  active && styles.formationOptionActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.formationOptionLabel,
+                    active && styles.formationOptionLabelActive,
+                  ]}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={async () => {
+              await setFormation(sessionId, undefined);
+              setFormationSheet(false);
+            }}
+            style={[
+              styles.formationOption,
+              !session?.formation && styles.formationOptionActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.formationOptionLabel,
+                !session?.formation && styles.formationOptionLabelActive,
+              ]}
+            >
+              Aucune
+            </Text>
+          </Pressable>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={!!slotSheet}
+        title={
+          slotSheet
+            ? `Poste ${slotSheet.slot.label} · ${POSITION_META[slotSheet.slot.position].label}`
+            : 'Poste'
+        }
+        onClose={() => setSlotSheet(null)}
+      >
+        {slotSheet
+          ? (() => {
+              const slot = slotSheet.slot;
+              const assignedPlayerId = lineupSlots[slot.id];
+              const assignedPlayer = assignedPlayerId
+                ? players.find((p) => p.id === assignedPlayerId)
+                : undefined;
+              const assignedSlotIds = new Set(Object.keys(lineupSlots));
+              const availableBench = convoqués.filter((p) => {
+                if (assignedPlayer && p.id === assignedPlayer.id) return false;
+                const isAssignedElsewhere = Object.entries(lineupSlots).some(
+                  ([sid, pid]) => pid === p.id && sid !== slot.id,
+                );
+                return !isAssignedElsewhere;
+              });
+              // If a player is assigned elsewhere, we still allow picking them
+              // (we'll swap). So build a combined list with a marker.
+              const reassignable = convoqués.filter((p) =>
+                Object.entries(lineupSlots).some(
+                  ([sid, pid]) => pid === p.id && sid !== slot.id,
+                ),
+              );
+
+              return (
+                <View>
+                  {assignedPlayer ? (
+                    <View style={styles.slotAssignedRow}>
+                      <Avatar
+                        name={assignedPlayer.name}
+                        photoUri={assignedPlayer.photoUri}
+                        size={44}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.slotAssignedName}>
+                          {assignedPlayer.name}
+                        </Text>
+                        <Text style={styles.slotAssignedMeta}>
+                          Actuellement {POSITION_META[slot.position].label}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={async () => {
+                          await assignToSlot(sessionId, slot.id, null);
+                          setSlotSheet(null);
+                        }}
+                        style={styles.slotRemove}
+                      >
+                        <Text style={styles.slotRemoveLabel}>Retirer</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.slotGroupLabel}>Banc (convoqués)</Text>
+                  {availableBench.length === 0 && reassignable.length === 0 ? (
+                    <Text style={styles.muted}>
+                      Tous les convoqués sont déjà placés. Libère un autre
+                      poste d'abord.
+                    </Text>
+                  ) : (
+                    <View style={styles.slotPlayerGrid}>
+                      {availableBench.map((p) => (
+                        <Pressable
+                          key={p.id}
+                          onPress={async () => {
+                            await assignToSlot(sessionId, slot.id, p.id);
+                            setSlotSheet(null);
+                          }}
+                          style={styles.slotPlayerChip}
+                        >
+                          <Avatar
+                            name={p.name}
+                            photoUri={p.photoUri}
+                            size={32}
+                          />
+                          <Text style={styles.slotPlayerName2}>{p.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+
+                  {reassignable.length > 0 ? (
+                    <>
+                      <Text style={styles.slotGroupLabel}>
+                        Déjà placés (repositionner)
+                      </Text>
+                      <View style={styles.slotPlayerGrid}>
+                        {reassignable.map((p) => (
+                          <Pressable
+                            key={p.id}
+                            onPress={async () => {
+                              await assignToSlot(sessionId, slot.id, p.id);
+                              setSlotSheet(null);
+                            }}
+                            style={[
+                              styles.slotPlayerChip,
+                              styles.slotPlayerChipMoved,
+                            ]}
+                          >
+                            <Avatar
+                              name={p.name}
+                              photoUri={p.photoUri}
+                              size={32}
+                            />
+                            <Text style={styles.slotPlayerName2}>
+                              {p.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </>
+                  ) : null}
+                  {assignedSlotIds.size === 0 ? null : null}
+                </View>
+              );
+            })()
+          : null}
       </BottomSheet>
     </SafeAreaView>
   );
@@ -614,6 +853,124 @@ const styles = StyleSheet.create({
     ...typography.h3,
     color: colors.textPrimary,
     marginTop: spacing.md,
+  },
+  formationCard: { gap: spacing.md },
+  formationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  formationTitle: { ...typography.h3, color: colors.textPrimary },
+  formationHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  formationChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  formationChipLabel: { color: colors.primary, fontWeight: '800', fontSize: 14 },
+  formationChipCaret: { color: colors.primary, fontWeight: '800' },
+  formationGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  formationOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexGrow: 1,
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  formationOptionActive: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  formationOptionLabel: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    fontSize: 16,
+  },
+  formationOptionLabelActive: { color: colors.primary },
+  noFormation: {
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  noFormationText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  slotAssignedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    marginBottom: spacing.md,
+  },
+  slotAssignedName: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  slotAssignedMeta: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  slotRemove: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: '#FEE2E2',
+  },
+  slotRemoveLabel: { color: colors.danger, fontWeight: '700' },
+  slotGroupLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  slotPlayerGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  slotPlayerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  slotPlayerChipMoved: {
+    borderColor: colors.warning,
+    borderStyle: 'dashed',
+  },
+  slotPlayerName2: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 13,
   },
   playerCard: {
     borderLeftWidth: 4,

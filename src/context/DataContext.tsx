@@ -5,6 +5,7 @@ import {
   STATUS_META,
   defaultStatusFor,
 } from '@/constants/statuses';
+import { findFormation } from '@/constants/formations';
 import { uid } from '@/utils/id';
 import { todayISO } from '@/utils/date';
 import type {
@@ -58,6 +59,8 @@ type DataContextValue = {
   toggleLineup: (sessionId: string, playerId: string) => Promise<void>;
   setLineupPosition: (sessionId: string, playerId: string, position: PlayerPosition | undefined) => Promise<void>;
   removeFromLineup: (sessionId: string, playerId: string) => Promise<void>;
+  setFormation: (sessionId: string, formationId: string | undefined) => Promise<void>;
+  assignToSlot: (sessionId: string, slotId: string, playerId: string | null) => Promise<void>;
   startMatch: (sessionId: string) => Promise<void>;
   endMatch: (sessionId: string) => Promise<void>;
   putOnPitch: (sessionId: string, playerId: string, position?: PlayerPosition) => Promise<void>;
@@ -594,6 +597,84 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [sessions],
   );
 
+  const setFormation = useCallback(
+    async (sessionId: string, formationId: string | undefined) => {
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              formation: formationId,
+              lineupSlots: formationId ? (s.lineupSlots ?? {}) : undefined,
+            }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('setFormation', () => remote.upsertSession(changed));
+      }
+    },
+    [sessions],
+  );
+
+  const assignToSlot = useCallback(
+    async (
+      sessionId: string,
+      slotId: string,
+      playerId: string | null,
+    ) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const formation = findFormation(session.formation);
+      if (!formation) return;
+      const slot = formation.slots.find((s) => s.id === slotId);
+      if (!slot) return;
+
+      const currentSlots: Record<string, string> = {
+        ...(session.lineupSlots ?? {}),
+      };
+
+      if (playerId) {
+        // If this player is already assigned elsewhere, remove from that slot
+        for (const [sid, pid] of Object.entries(currentSlots)) {
+          if (pid === playerId && sid !== slotId) {
+            delete currentSlots[sid];
+          }
+        }
+        currentSlots[slotId] = playerId;
+      } else {
+        delete currentSlots[slotId];
+      }
+
+      // Derive startingLineup + lineupPositions from the slots map.
+      const nextLineup = Array.from(new Set(Object.values(currentSlots)));
+      const nextPositions: Record<string, PlayerPosition> = {};
+      for (const [sid, pid] of Object.entries(currentSlots)) {
+        const s = formation.slots.find((x) => x.id === sid);
+        if (s) nextPositions[pid] = s.position;
+      }
+
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              lineupSlots: currentSlots,
+              startingLineup: nextLineup,
+              lineupPositions: nextPositions,
+            }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('assignToSlot', () => remote.upsertSession(changed));
+      }
+    },
+    [sessions],
+  );
+
   const startMatch = useCallback(
     async (sessionId: string) => {
       const session = sessions.find((s) => s.id === sessionId);
@@ -607,15 +688,37 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setSessions(nextSessions);
       await db.saveSessions(nextSessions);
 
-      const lineupIds = session.startingLineup ?? [];
-      const positions = session.lineupPositions ?? {};
-      const newStints: PlayerStint[] = lineupIds.map((playerId) => ({
-        id: uid(),
-        sessionId,
-        playerId,
-        position: positions[playerId],
-        startAt: startedAt,
-      }));
+      // If the coach picked a formation + filled slots, prefer that as
+      // the source of truth for the starting stints.
+      const formation = findFormation(session.formation);
+      const slots = session.lineupSlots ?? {};
+      const usingFormation =
+        formation && Object.keys(slots).length > 0;
+
+      let newStints: PlayerStint[] = [];
+      if (usingFormation) {
+        newStints = Object.entries(slots).map(([slotId, playerId]) => {
+          const slot = formation!.slots.find((s) => s.id === slotId);
+          return {
+            id: uid(),
+            sessionId,
+            playerId,
+            position: slot?.position,
+            startAt: startedAt,
+          };
+        });
+      } else {
+        const lineupIds = session.startingLineup ?? [];
+        const positions = session.lineupPositions ?? {};
+        newStints = lineupIds.map((playerId) => ({
+          id: uid(),
+          sessionId,
+          playerId,
+          position: positions[playerId],
+          startAt: startedAt,
+        }));
+      }
+
       if (newStints.length > 0) {
         const nextStints = [...stints, ...newStints];
         setStints(nextStints);
@@ -881,6 +984,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     toggleLineup,
     setLineupPosition,
     removeFromLineup,
+    setFormation,
+    assignToSlot,
     startMatch,
     endMatch,
     putOnPitch,
