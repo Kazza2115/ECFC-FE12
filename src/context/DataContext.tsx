@@ -1,6 +1,8 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 import { db, SEED_PLAYERS } from '@/storage/database';
 import { remote } from '@/storage/remote';
+import { supabase } from '@/storage/supabase';
 import {
   STATUS_META,
   defaultStatusFor,
@@ -242,6 +244,112 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       warn('refresh', err);
       markOffline('refresh', err);
     }
+  }, []);
+
+  // Stable ref so listeners installed once below always call the latest fn.
+  const refreshRef = useRef(refreshFromCloud);
+  useEffect(() => {
+    refreshRef.current = refreshFromCloud;
+  }, [refreshFromCloud]);
+
+  // Realtime: any postgres change in our team triggers a debounced refresh
+  // so every coach's phone shows the same data within a second or two.
+  useEffect(() => {
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const schedule = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        refreshRef.current();
+      }, 600);
+    };
+
+    const channel = supabase
+      .channel('ecfc-team-feed')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_players' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_sessions' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_attendances' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_match_events' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_player_stints' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_saved_formations' },
+        schedule,
+      )
+      .subscribe();
+
+    return () => {
+      if (pending) clearTimeout(pending);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Auto-refresh when the tab becomes visible (web) or the app is brought
+  // back to foreground (iOS / Android), plus a 30s heartbeat as a safety
+  // net in case realtime drops.
+  useEffect(() => {
+    const heartbeat = setInterval(() => {
+      const visible =
+        Platform.OS !== 'web' ||
+        typeof document === 'undefined' ||
+        document.visibilityState === 'visible';
+      if (visible) refreshRef.current();
+    }, 30_000);
+
+    if (Platform.OS === 'web') {
+      const onVisible = () => {
+        if (
+          typeof document !== 'undefined' &&
+          document.visibilityState === 'visible'
+        ) {
+          refreshRef.current();
+        }
+      };
+      const onFocus = () => refreshRef.current();
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisible);
+      }
+      if (typeof window !== 'undefined') {
+        window.addEventListener('focus', onFocus);
+      }
+      return () => {
+        clearInterval(heartbeat);
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', onVisible);
+        }
+        if (typeof window !== 'undefined') {
+          window.removeEventListener('focus', onFocus);
+        }
+      };
+    }
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshRef.current();
+    });
+    return () => {
+      clearInterval(heartbeat);
+      sub.remove();
+    };
   }, []);
 
   const pushSafe = async (
