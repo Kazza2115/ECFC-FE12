@@ -82,6 +82,7 @@ type DataContextValue = {
   activeMatchesCount: number;
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
+  lastSyncError: string | null;
   refreshFromCloud: () => Promise<void>;
   resetAll: () => Promise<void>;
 };
@@ -106,6 +107,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [savedFormations, setSavedFormations] = useState<SavedFormation[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
 
   const warn = (context: string, err: unknown) => {
     if (typeof console !== 'undefined') {
@@ -116,6 +118,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const markSynced = () => {
     setSyncStatus('synced');
     setLastSyncedAt(new Date().toISOString());
+    setLastSyncError(null);
+  };
+
+  const markOffline = (label: string, err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    setLastSyncError(`${label} → ${msg}`);
+    setSyncStatus('offline');
   };
 
   useEffect(() => {
@@ -201,7 +210,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         markSynced();
       } catch (err) {
         warn('initial-fetch', err);
-        setSyncStatus('offline');
+        markOffline('initial-fetch', err);
       }
     })();
   }, []);
@@ -231,7 +240,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       markSynced();
     } catch (err) {
       warn('refresh', err);
-      setSyncStatus('offline');
+      markOffline('refresh', err);
     }
   }, []);
 
@@ -245,7 +254,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       markSynced();
     } catch (err) {
       warn(label, err);
-      setSyncStatus('offline');
+      markOffline(label, err);
     }
   };
 
@@ -317,7 +326,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         warn('uploadPhoto', err);
         finalUri = photoUri;
-        setSyncStatus('offline');
+        markOffline('uploadPhoto', err);
       }
     } else if (!photoUri) {
       try {
@@ -1198,6 +1207,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     activeMatchesCount: activeMatches.length,
     syncStatus,
     lastSyncedAt,
+    lastSyncError,
     refreshFromCloud,
     resetAll,
   };

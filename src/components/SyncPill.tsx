@@ -1,18 +1,43 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, typography } from '@/theme';
+import { confirm, notify } from '@/utils/confirm';
 import type { SyncStatus } from '@/context/DataContext';
 
 type Props = {
   status: SyncStatus;
+  lastError?: string | null;
   onRefresh: () => void;
 };
 
-export function SyncPill({ status, onRefresh }: Props) {
+export function SyncPill({ status, lastError, onRefresh }: Props) {
   const meta = META[status];
+
+  const handlePress = async () => {
+    if (status === 'syncing') return;
+    if (status === 'offline' && lastError) {
+      const ok = await confirm({
+        title: 'Synchronisation hors ligne',
+        message: `Dernière erreur :\n\n${lastError}\n\nRéessayer maintenant ?`,
+        confirmLabel: 'Réessayer',
+      });
+      if (ok) onRefresh();
+      return;
+    }
+    if (status === 'offline') {
+      await notify(
+        'Hors ligne',
+        'Impossible de joindre Supabase. Vérifie ta connexion ou que les tables/colonnes sont à jour, puis re-tape la pastille.',
+      );
+      onRefresh();
+      return;
+    }
+    onRefresh();
+  };
+
   return (
     <Pressable
-      onPress={onRefresh}
+      onPress={handlePress}
       disabled={status === 'syncing'}
       style={[styles.pill, { backgroundColor: meta.bg }]}
     >

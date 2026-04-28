@@ -41,6 +41,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     activeMatchesCount,
     createSession,
     syncStatus,
+    lastSyncError,
     refreshFromCloud,
   } = useData();
 
@@ -100,7 +101,11 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             <Text style={styles.subtitle}>Étoile Carouge FC · Juniors</Text>
           </View>
           <View style={styles.headerRight}>
-            <SyncPill status={syncStatus} onRefresh={refreshFromCloud} />
+            <SyncPill
+              status={syncStatus}
+              lastError={lastSyncError}
+              onRefresh={refreshFromCloud}
+            />
             <ClubLogo size={48} />
           </View>
         </View>
