@@ -1,6 +1,7 @@
 import { EVENT_META } from '@/constants/events';
 import { POSITION_META } from '@/constants/positions';
 import { STATUS_META } from '@/constants/statuses';
+import { isMatchKind } from '@/types';
 import type {
   Attendance,
   MatchEvent,
@@ -108,10 +109,10 @@ export function buildAttendanceCSV(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
   );
   const trainingSessions = sortedSessions.filter(
-    (s) => !s.cancelled && s.kind !== 'match',
+    (s) => !s.cancelled && !isMatchKind(s.kind),
   );
   const matchSessions = sortedSessions.filter(
-    (s) => !s.cancelled && s.kind === 'match',
+    (s) => !s.cancelled && isMatchKind(s.kind),
   );
   const sortedPlayers = [...players].sort((a, b) =>
     a.name.localeCompare(b.name),

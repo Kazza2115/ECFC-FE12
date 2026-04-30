@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { isMatchKind } from '@/types';
 import {
   Modal,
   Pressable,
@@ -47,6 +48,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
+  const [matchFormat, setMatchFormat] = useState<'match' | 'match_7x7'>('match');
 
   const topPlayers = playerStats.slice(0, 5);
   const lastSession = sessions[0];
@@ -57,7 +59,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
       .filter(
         (iso) =>
           !sessions.some(
-            (s) => !s.cancelled && s.kind !== 'match' && sameDay(s.date, iso),
+            (s) => !s.cancelled && !isMatchKind(s.kind) && sameDay(s.date, iso),
           ),
       )
       .slice(0, 3);
@@ -76,11 +78,12 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
   const startMatch = async () => {
     const label = opponent.trim();
     const session = await createSession({
-      kind: 'match',
+      kind: matchFormat,
       label: label || undefined,
     });
     setMatchModalOpen(false);
     setOpponent('');
+    setMatchFormat('match');
     navigation.navigate('Session', { sessionId: session.id });
   };
 
@@ -119,7 +122,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               </Text>
               {lastSession ? (
                 <Text style={styles.heroMeta}>
-                  Dernière {lastSession.kind === 'match' ? 'convocation' : 'séance'} : {formatDate(lastSession.date)}
+                  Dernière {isMatchKind(lastSession.kind) ? 'convocation' : 'séance'} : {formatDate(lastSession.date)}
                   {lastSession.cancelled ? ' (annulée)' : ''}
                 </Text>
               ) : null}
@@ -255,6 +258,47 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               returnKeyType="go"
               onSubmitEditing={startMatch}
             />
+
+            <Text style={styles.formatLabel}>Format</Text>
+            <View style={styles.formatRow}>
+              <Pressable
+                onPress={() => setMatchFormat('match')}
+                style={[
+                  styles.formatOption,
+                  matchFormat === 'match' && styles.formatOptionActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.formatOptionTitle,
+                    matchFormat === 'match' && styles.formatOptionTitleActive,
+                  ]}
+                >
+                  11 vs 11
+                </Text>
+                <Text style={styles.formatOptionSub}>Match standard</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setMatchFormat('match_7x7')}
+                style={[
+                  styles.formatOption,
+                  matchFormat === 'match_7x7' && styles.formatOptionActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.formatOptionTitle,
+                    matchFormat === 'match_7x7' && styles.formatOptionTitleActive,
+                  ]}
+                >
+                  7 vs 7
+                </Text>
+                <Text style={styles.formatOptionSub}>
+                  4 quart-temps · 4 équipes
+                </Text>
+              </Pressable>
+            </View>
+
             <View style={styles.modalActions}>
               <Button
                 label="Annuler"
@@ -387,6 +431,38 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textPrimary,
     backgroundColor: colors.background,
+  },
+  formatLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  formatRow: { flexDirection: 'row', gap: spacing.sm },
+  formatOption: {
+    flex: 1,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  formatOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+  },
+  formatOptionTitle: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  formatOptionTitleActive: { color: colors.primary },
+  formatOptionSub: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   modalActions: {
     flexDirection: 'row',

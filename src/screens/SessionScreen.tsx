@@ -25,6 +25,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
 import { confirm } from '@/utils/confirm';
 import type { AttendanceStatus, Player, SessionKind } from '@/types';
+import { isMatchKind } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
 
@@ -46,7 +47,7 @@ export function SessionScreen({ route, navigation }: Props) {
 
   const session = sessions.find((s) => s.id === sessionId);
   const kind: SessionKind = session?.kind ?? 'training';
-  const isMatch = kind === 'match';
+  const isMatch = isMatchKind(kind);
   const cancelled = !!session?.cancelled;
   const isConfirmed = !!session?.confirmed;
 

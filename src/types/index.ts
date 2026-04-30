@@ -5,7 +5,13 @@ export type Player = {
   createdAt: string;
 };
 
-export type SessionKind = 'training' | 'match';
+export type SessionKind = 'training' | 'match' | 'match_7x7';
+
+export type QuarterIndex = 1 | 2 | 3 | 4;
+
+export function isMatchKind(kind: SessionKind | undefined): boolean {
+  return kind === 'match' || kind === 'match_7x7';
+}
 
 export type PauseInterval = {
   start: string;
@@ -26,6 +32,8 @@ export type Session = {
   formation?: string;
   lineupSlots?: Record<string, string>;
   pauseIntervals?: PauseInterval[];
+  quarterTeams?: Record<string, Record<string, string>>;
+  currentQuarter?: number;
   createdAt: string;
 };
 
@@ -92,6 +100,7 @@ export type PlayerStint = {
   position?: PlayerPosition;
   startAt: string;
   endAt?: string;
+  quarter?: number;
 };
 
 export type SavedFormation = {

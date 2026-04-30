@@ -24,6 +24,7 @@ import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { buildAttendanceCSV } from '@/utils/csv';
 import type { MatchEventType, PlayerMatchTotals } from '@/types';
+import { isMatchKind } from '@/types';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -364,7 +365,7 @@ function MatchView({
   const matchSessions = useMemo(
     () =>
       sessions
-        .filter((s) => s.kind === 'match' && !s.cancelled)
+        .filter((s) => isMatchKind(s.kind) && !s.cancelled)
         .sort(
           (a, b) =>
             new Date(b.date).getTime() - new Date(a.date).getTime(),

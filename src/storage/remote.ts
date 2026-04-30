@@ -33,6 +33,8 @@ type DbSession = {
   formation: string | null;
   lineup_slots: Record<string, string> | null;
   pause_intervals: Array<{ start: string; end?: string }> | null;
+  quarter_teams: Record<string, Record<string, string>> | null;
+  current_quarter: number | null;
   team_id: string;
   created_at: string;
   updated_at: string;
@@ -63,6 +65,7 @@ type DbStint = {
   position: string | null;
   start_at: string;
   end_at: string | null;
+  quarter: number | null;
   team_id: string;
 };
 
@@ -114,6 +117,8 @@ function toDbSession(s: Session): DbSession {
     formation: s.formation ?? null,
     lineup_slots: s.lineupSlots ?? null,
     pause_intervals: s.pauseIntervals ?? null,
+    quarter_teams: s.quarterTeams ?? null,
+    current_quarter: s.currentQuarter ?? null,
     team_id: TEAM_ID,
     created_at: s.createdAt,
     updated_at: now(),
@@ -136,6 +141,8 @@ function fromDbSession(row: DbSession): Session {
     formation: row.formation ?? undefined,
     lineupSlots: row.lineup_slots ?? undefined,
     pauseIntervals: row.pause_intervals ?? undefined,
+    quarterTeams: row.quarter_teams ?? undefined,
+    currentQuarter: row.current_quarter ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -190,6 +197,7 @@ function toDbStint(st: PlayerStint): DbStint {
     position: st.position ?? null,
     start_at: st.startAt,
     end_at: st.endAt ?? null,
+    quarter: st.quarter ?? null,
     team_id: TEAM_ID,
   };
 }
@@ -202,6 +210,7 @@ function fromDbStint(row: DbStint): PlayerStint {
     position: (row.position as PlayerPosition) ?? undefined,
     startAt: row.start_at,
     endAt: row.end_at ?? undefined,
+    quarter: row.quarter ?? undefined,
   };
 }
 

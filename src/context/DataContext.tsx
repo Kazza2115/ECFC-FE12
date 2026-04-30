@@ -10,6 +10,7 @@ import {
 import { findFormation } from '@/constants/formations';
 import { uid } from '@/utils/id';
 import { todayISO } from '@/utils/date';
+import { isMatchKind } from '@/types';
 import type {
   Attendance,
   AttendanceStatus,
@@ -93,11 +94,11 @@ type DataContextValue = {
 const DataContext = createContext<DataContextValue | null>(null);
 
 function isMatch(s: Session): boolean {
-  return s.kind === 'match';
+  return isMatchKind(s.kind);
 }
 
 function isTraining(s: Session): boolean {
-  return s.kind !== 'match';
+  return !isMatchKind(s.kind);
 }
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
