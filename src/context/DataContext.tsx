@@ -50,7 +50,7 @@ type DataContextValue = {
   createSession: (opts?: { kind?: SessionKind; label?: string; date?: string }) => Promise<Session>;
   deleteSession: (id: string) => Promise<void>;
   toggleCancelled: (sessionId: string) => Promise<void>;
-  confirmSession: (sessionId: string) => Promise<void>;
+  setSessionConfirmed: (sessionId: string, value: boolean) => Promise<void>;
   setAttendance: (sessionId: string, playerId: string, status: AttendanceStatus) => Promise<void>;
   bulkSetAttendance: (sessionId: string, status: AttendanceStatus) => Promise<void>;
   getStatus: (sessionId: string, playerId: string) => AttendanceStatus;
@@ -517,17 +517,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sessions]);
 
-  const confirmSession = useCallback(async (sessionId: string) => {
-    const next = sessions.map((s) =>
-      s.id === sessionId ? { ...s, confirmed: true } : s,
-    );
-    setSessions(next);
-    await db.saveSessions(next);
-    const changed = next.find((s) => s.id === sessionId);
-    if (changed) {
-      await pushSafe('confirmSession', () => remote.upsertSession(changed));
-    }
-  }, [sessions]);
+  const setSessionConfirmed = useCallback(
+    async (sessionId: string, value: boolean) => {
+      const next = sessions.map((s) =>
+        s.id === sessionId ? { ...s, confirmed: value } : s,
+      );
+      setSessions(next);
+      await db.saveSessions(next);
+      const changed = next.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('setSessionConfirmed', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
 
   const setAttendance = useCallback(async (sessionId: string, playerId: string, status: AttendanceStatus) => {
     const record: Attendance = { sessionId, playerId, status };
@@ -1294,7 +1299,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     createSession,
     deleteSession,
     toggleCancelled,
-    confirmSession,
+    setSessionConfirmed,
     setAttendance,
     bulkSetAttendance,
     getStatus,

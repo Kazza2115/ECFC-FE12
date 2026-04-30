@@ -157,6 +157,18 @@ export function SessionsListScreen({ navigation }: Props) {
                       >
                         {formatDate(s.date)}
                       </Text>
+                      {!s.cancelled && !s.confirmed ? (
+                        <View style={styles.draftPill}>
+                          <Text style={styles.draftPillLabel}>Brouillon</Text>
+                        </View>
+                      ) : null}
+                      {!s.cancelled && s.confirmed ? (
+                        <View style={styles.confirmedPill}>
+                          <Text style={styles.confirmedPillLabel}>
+                            ✓ Confirmé
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                     {s.cancelled ? (
                       <View style={styles.cancelPill}>
@@ -283,6 +295,34 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     fontWeight: '700',
+  },
+  draftPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: '#FEF3C7',
+    marginTop: 4,
+  },
+  draftPillLabel: {
+    ...typography.caption,
+    color: '#92400E',
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  confirmedPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: '#DCFCE7',
+    marginTop: 4,
+  },
+  confirmedPillLabel: {
+    ...typography.caption,
+    color: '#166534',
+    fontWeight: '800',
+    fontSize: 11,
   },
   modalOverlay: {
     flex: 1,

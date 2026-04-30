@@ -41,7 +41,7 @@ export function SessionScreen({ route, navigation }: Props) {
     bulkSetAttendance,
     deleteSession,
     toggleCancelled,
-    confirmSession,
+    setSessionConfirmed,
   } = useData();
 
   const session = sessions.find((s) => s.id === sessionId);
@@ -58,17 +58,19 @@ export function SessionScreen({ route, navigation }: Props) {
     [kind, primaryStatuses],
   );
 
-  const touchedRef = useRef(
+  // Re-evaluate "should keep" on every render so the unmount cleanup
+  // sees the latest state (handles confirm → unconfirm → leave for ex.).
+  const keepRef = useRef(false);
+  keepRef.current =
     attendances.some((a) => a.sessionId === sessionId) ||
-      !!session?.cancelled ||
-      !!session?.confirmed,
-  );
+    !!session?.cancelled ||
+    !!session?.confirmed;
   const explicitlyDeletedRef = useRef(false);
 
   useEffect(() => {
     return () => {
       if (explicitlyDeletedRef.current) return;
-      if (touchedRef.current) return;
+      if (keepRef.current) return;
       deleteSession(sessionId).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +94,6 @@ export function SessionScreen({ route, navigation }: Props) {
   }, [players, getStatus, sessionId]);
 
   const pickStatus = async (playerId: string, status: AttendanceStatus) => {
-    touchedRef.current = true;
     try {
       await Haptics.selectionAsync();
     } catch {}
@@ -100,7 +101,6 @@ export function SessionScreen({ route, navigation }: Props) {
   };
 
   const markAll = async (status: AttendanceStatus) => {
-    touchedRef.current = true;
     try {
       await Haptics.notificationAsync(
         status === 'present'
@@ -112,7 +112,6 @@ export function SessionScreen({ route, navigation }: Props) {
   };
 
   const handleToggleCancelled = async () => {
-    touchedRef.current = true;
     try {
       await Haptics.selectionAsync();
     } catch {}
@@ -186,16 +185,15 @@ export function SessionScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      {!isConfirmed && !cancelled ? (
+      {!cancelled && !isConfirmed ? (
         <Pressable
           onPress={async () => {
-            touchedRef.current = true;
             try {
               await Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success,
               );
             } catch {}
-            await confirmSession(sessionId);
+            await setSessionConfirmed(sessionId, true);
           }}
           style={styles.confirmBanner}
         >
@@ -212,6 +210,41 @@ export function SessionScreen({ route, navigation }: Props) {
             <Text style={styles.confirmBannerCtaLabel}>Confirmer</Text>
           </View>
         </Pressable>
+      ) : null}
+
+      {!cancelled && isConfirmed ? (
+        <View style={styles.confirmedBanner}>
+          <Text style={styles.confirmedGlyph}>✓</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.confirmedTitle}>
+              {isMatch ? 'Match confirmé' : 'Entraînement confirmé'}
+            </Text>
+            <Text style={styles.confirmedHint}>
+              La séance est enregistrée et synchronisée pour tout le staff.
+            </Text>
+          </View>
+          <Pressable
+            onPress={async () => {
+              const ok = await confirm({
+                title: 'Annuler la confirmation ?',
+                message:
+                  'La séance redevient un brouillon. Si tu n\'enregistres rien d\'autre, elle sera supprimée en quittant l\'écran.',
+                confirmLabel: 'Annuler',
+                destructive: true,
+              });
+              if (!ok) return;
+              try {
+                await Haptics.notificationAsync(
+                  Haptics.NotificationFeedbackType.Warning,
+                );
+              } catch {}
+              await setSessionConfirmed(sessionId, false);
+            }}
+            style={styles.confirmedUndo}
+          >
+            <Text style={styles.confirmedUndoLabel}>Annuler</Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {!cancelled ? (
@@ -454,6 +487,48 @@ const styles = StyleSheet.create({
   confirmBannerCtaLabel: {
     color: '#FFFFFF',
     fontWeight: '800',
+    fontSize: 13,
+  },
+  confirmedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#16A34A',
+  },
+  confirmedGlyph: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#15803D',
+    width: 26,
+    textAlign: 'center',
+  },
+  confirmedTitle: {
+    ...typography.bodyBold,
+    color: '#14532D',
+    fontSize: 14,
+  },
+  confirmedHint: {
+    ...typography.caption,
+    color: '#166534',
+    marginTop: 2,
+  },
+  confirmedUndo: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#16A34A',
+  },
+  confirmedUndoLabel: {
+    color: '#15803D',
+    fontWeight: '700',
     fontSize: 13,
   },
   bulkRow: {
