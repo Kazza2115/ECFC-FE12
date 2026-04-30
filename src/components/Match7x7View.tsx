@@ -160,7 +160,6 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     !ended &&
     currentQuarter === undefined &&
     !playedQuarters.has(selectedQuarter);
-  const canEndCurrent = !ended && currentQuarter === selectedQuarter;
   const allQuartersDone =
     playedQuarters.size >= 4 || (playedQuarters.size === 3 && currentQuarter === 4);
 
@@ -222,12 +221,24 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
         })}
       </View>
 
-      {currentQuarter === selectedQuarter && currentQuarter !== undefined ? (
+      {currentQuarter !== undefined && !ended ? (
         <Card style={styles.liveClock}>
           <Text style={styles.liveClockLabel}>Q{currentQuarter} en cours</Text>
           <Text style={styles.liveClockValue}>
             {fmt(quarterElapsed)} <Text style={styles.liveClockTotal}>/ 15:00</Text>
           </Text>
+          <Text style={styles.liveClockHint}>
+            Tu peux terminer le quart-temps à tout moment, pas besoin
+            d'attendre 15 min.
+          </Text>
+          <Pressable
+            onPress={handleEndQuarter}
+            style={styles.liveEndBtn}
+          >
+            <Text style={styles.liveEndBtnLabel}>
+              ⏹ Terminer Q{currentQuarter} maintenant
+            </Text>
+          </Pressable>
         </Card>
       ) : null}
 
@@ -264,14 +275,6 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
           <Button
             label={`▶ Démarrer Q${selectedQuarter}`}
             onPress={handleStartQuarter}
-            fullWidth
-          />
-        ) : null}
-        {canEndCurrent ? (
-          <Button
-            label={`Fin Q${currentQuarter}`}
-            variant="secondary"
-            onPress={handleEndQuarter}
             fullWidth
           />
         ) : null}
@@ -537,6 +540,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.textMuted,
     fontWeight: '600',
+  },
+  liveClockHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  liveEndBtn: {
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 12,
+    borderRadius: radius.pill,
+    backgroundColor: colors.danger,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+  },
+  liveEndBtnLabel: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 14,
   },
   pitchCard: {},
   formationFootnote: {
