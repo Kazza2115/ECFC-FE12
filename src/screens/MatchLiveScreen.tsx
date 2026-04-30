@@ -15,6 +15,7 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { FormationPitch } from '@/components/FormationPitch';
+import { Match7x7View } from '@/components/Match7x7View';
 import { EVENT_META, EVENT_ORDER } from '@/constants/events';
 import {
   DEFAULT_FORMATION_ID,
@@ -331,6 +332,20 @@ export function MatchLiveScreen({ route, navigation }: Props) {
 
   const pitchPlayers = convoqués.filter((p) => onPitchIds.has(p.id));
   const benchPlayers = convoqués.filter((p) => !onPitchIds.has(p.id));
+
+  if (session.kind === 'match_7x7') {
+    return (
+      <SafeAreaView style={styles.safe} edges={['bottom']}>
+        <ScrollView contentContainerStyle={styles.scroll}>
+          <Match7x7View
+            session={session}
+            sessionId={sessionId}
+            convoqués={convoqués}
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>

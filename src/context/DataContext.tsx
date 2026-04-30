@@ -66,6 +66,9 @@ type DataContextValue = {
   removeFromLineup: (sessionId: string, playerId: string) => Promise<void>;
   setFormation: (sessionId: string, formationId: string | undefined) => Promise<void>;
   assignToSlot: (sessionId: string, slotId: string, playerId: string | null) => Promise<void>;
+  assignToQuarterSlot: (sessionId: string, quarter: number, slotId: string, playerId: string | null) => Promise<void>;
+  startQuarter: (sessionId: string, quarter: number) => Promise<void>;
+  endQuarter: (sessionId: string) => Promise<void>;
   savedFormations: SavedFormation[];
   saveFormation: (name: string, counts: number[]) => Promise<SavedFormation>;
   deleteSavedFormation: (id: string) => Promise<void>;
@@ -460,12 +463,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [players]);
 
   const createSession = useCallback(async (opts?: { kind?: SessionKind; label?: string; date?: string }) => {
+    const sessionKind = opts?.kind ?? 'training';
     const session: Session = {
       id: uid(),
       date: opts?.date ?? todayISO(),
       label: opts?.label,
-      kind: opts?.kind ?? 'training',
+      kind: sessionKind,
       cancelled: false,
+      formation: sessionKind === 'match_7x7' ? '2-3-1' : undefined,
       createdAt: todayISO(),
     };
     const next = [session, ...sessions];
@@ -825,6 +830,139 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     },
     [sessions],
   );
+
+  // -- Match 7x7 — quarter team management --
+
+  const assignToQuarterSlot = useCallback(
+    async (
+      sessionId: string,
+      quarter: number,
+      slotId: string,
+      playerId: string | null,
+    ) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const allTeams: Record<string, Record<string, string>> = {
+        ...(session.quarterTeams ?? {}),
+      };
+      const key = String(quarter);
+      const team: Record<string, string> = { ...(allTeams[key] ?? {}) };
+      if (playerId) {
+        // If this player is already in this quarter on another slot,
+        // remove them from there to avoid duplicates.
+        for (const [sid, pid] of Object.entries(team)) {
+          if (pid === playerId && sid !== slotId) delete team[sid];
+        }
+        team[slotId] = playerId;
+      } else {
+        delete team[slotId];
+      }
+      allTeams[key] = team;
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, quarterTeams: allTeams } : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('assignToQuarterSlot', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
+
+  const startQuarter = useCallback(
+    async (sessionId: string, quarter: number) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const formation = findFormation(session.formation);
+      const team = session.quarterTeams?.[String(quarter)] ?? {};
+
+      // Close any still-open stint for this session before opening
+      // the new quarter.
+      const startedAt = todayISO();
+      const openStints = stints.filter(
+        (st) => st.sessionId === sessionId && !st.endAt,
+      );
+      const closedStints = openStints.map((st) => ({ ...st, endAt: startedAt }));
+      const closedMap = new Map(closedStints.map((s) => [s.id, s]));
+      const carriedStints = stints.map((st) => closedMap.get(st.id) ?? st);
+
+      const newStints: PlayerStint[] = Object.entries(team).map(
+        ([slotId, playerId]) => {
+          const slot = formation?.slots.find((s) => s.id === slotId);
+          return {
+            id: uid(),
+            sessionId,
+            playerId,
+            position: slot?.position,
+            startAt: startedAt,
+            quarter,
+          };
+        },
+      );
+
+      const nextStints = [...carriedStints, ...newStints];
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              startedAt: s.startedAt ?? startedAt,
+              currentQuarter: quarter,
+              endedAt: undefined,
+            }
+          : s,
+      );
+
+      setStints(nextStints);
+      setSessions(nextSessions);
+      await Promise.all([
+        db.saveStints(nextStints),
+        db.saveSessions(nextSessions),
+      ]);
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('startQuarter', async () => {
+        if (changed) await remote.upsertSession(changed);
+        if (closedStints.length > 0) await remote.upsertStints(closedStints);
+        if (newStints.length > 0) await remote.upsertStints(newStints);
+      });
+    },
+    [sessions, stints],
+  );
+
+  const endQuarter = useCallback(
+    async (sessionId: string) => {
+      const endAt = todayISO();
+      const openStints = stints.filter(
+        (st) => st.sessionId === sessionId && !st.endAt,
+      );
+      const closedStints = openStints.map((st) => ({ ...st, endAt }));
+      const closedMap = new Map(closedStints.map((s) => [s.id, s]));
+      const nextStints = stints.map((st) => closedMap.get(st.id) ?? st);
+
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, currentQuarter: undefined } : s,
+      );
+
+      setStints(nextStints);
+      setSessions(nextSessions);
+      await Promise.all([
+        db.saveStints(nextStints),
+        db.saveSessions(nextSessions),
+      ]);
+
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      await pushSafe('endQuarter', async () => {
+        if (changed) await remote.upsertSession(changed);
+        if (closedStints.length > 0) await remote.upsertStints(closedStints);
+      });
+    },
+    [sessions, stints],
+  );
+
 
   const startMatch = useCallback(
     async (sessionId: string) => {
@@ -1315,6 +1453,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     removeFromLineup,
     setFormation,
     assignToSlot,
+    assignToQuarterSlot,
+    startQuarter,
+    endQuarter,
     savedFormations,
     saveFormation,
     deleteSavedFormation,
