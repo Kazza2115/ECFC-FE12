@@ -17,7 +17,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
-import { confirm } from '@/utils/confirm';
+import { confirm, notify } from '@/utils/confirm';
 import { formatDate } from '@/utils/date';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -51,9 +51,16 @@ export function SessionsListScreen({ navigation }: Props) {
 
   const startMatch = async () => {
     const label = opponent.trim();
+    if (!label) {
+      await notify(
+        'Adversaire requis',
+        'Indique le nom de l\'équipe adverse pour créer le match.',
+      );
+      return;
+    }
     const s = await createSession({
       kind: matchFormat,
-      label: label || undefined,
+      label,
     });
     setMatchModalOpen(false);
     setOpponent('');

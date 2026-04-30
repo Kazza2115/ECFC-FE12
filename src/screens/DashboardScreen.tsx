@@ -22,6 +22,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate, nextTrainingDates, sameDay } from '@/utils/date';
+import { notify } from '@/utils/confirm';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -77,9 +78,16 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
   const startMatch = async () => {
     const label = opponent.trim();
+    if (!label) {
+      await notify(
+        'Adversaire requis',
+        'Indique le nom de l\'équipe adverse pour créer le match.',
+      );
+      return;
+    }
     const session = await createSession({
       kind: matchFormat,
-      label: label || undefined,
+      label,
     });
     setMatchModalOpen(false);
     setOpponent('');

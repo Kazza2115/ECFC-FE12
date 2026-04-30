@@ -23,7 +23,7 @@ import {
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { formatDate } from '@/utils/date';
-import { confirm } from '@/utils/confirm';
+import { confirm, notify } from '@/utils/confirm';
 import type { AttendanceStatus, Player, SessionKind } from '@/types';
 import { isMatchKind } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -60,12 +60,15 @@ export function SessionScreen({ route, navigation }: Props) {
   );
 
   // Re-evaluate "should keep" on every render so the unmount cleanup
-  // sees the latest state (handles confirm → unconfirm → leave for ex.).
+  // sees the latest state. Trainings rely on the explicit "Confirmer"
+  // banner; matches keep themselves the moment the coach convokes
+  // anyone or starts the chrono.
   const keepRef = useRef(false);
   keepRef.current =
     attendances.some((a) => a.sessionId === sessionId) ||
     !!session?.cancelled ||
-    !!session?.confirmed;
+    (!isMatch && !!session?.confirmed) ||
+    !!session?.startedAt;
   const explicitlyDeletedRef = useRef(false);
 
   useEffect(() => {
@@ -93,6 +96,22 @@ export function SessionScreen({ route, navigation }: Props) {
       return STATUS_META[s]?.countsPresent;
     }).length;
   }, [players, getStatus, sessionId]);
+
+  const requiredConvoqués = session?.kind === 'match_7x7' ? 7 : 11;
+  const matchFormatLabel = session?.kind === 'match_7x7' ? '7 vs 7' : '11 vs 11';
+
+  const handleModeLive = async () => {
+    if (presentCount < requiredConvoqués) {
+      await notify(
+        'Pas assez de convoqués',
+        `Tu as convoqué ${presentCount} joueur${
+          presentCount > 1 ? 's' : ''
+        }. Il en faut au moins ${requiredConvoqués} pour démarrer un match ${matchFormatLabel}.`,
+      );
+      return;
+    }
+    navigation.navigate('MatchLive', { sessionId });
+  };
 
   const pickStatus = async (playerId: string, status: AttendanceStatus) => {
     try {
@@ -186,7 +205,7 @@ export function SessionScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      {!cancelled && !isConfirmed ? (
+      {!cancelled && !isMatch && !isConfirmed ? (
         <Pressable
           onPress={async () => {
             try {
@@ -200,7 +219,7 @@ export function SessionScreen({ route, navigation }: Props) {
         >
           <View style={{ flex: 1 }}>
             <Text style={styles.confirmBannerTitle}>
-              {isMatch ? 'Match à confirmer' : 'Entraînement à confirmer'}
+              Entraînement à confirmer
             </Text>
             <Text style={styles.confirmBannerHint}>
               Sans confirmation, la séance sera supprimée en quittant
@@ -213,7 +232,7 @@ export function SessionScreen({ route, navigation }: Props) {
         </Pressable>
       ) : null}
 
-      {!cancelled && isConfirmed ? (
+      {!cancelled && !isMatch && isConfirmed ? (
         <View style={styles.confirmedBanner}>
           <Text style={styles.confirmedGlyph}>✓</Text>
           <View style={{ flex: 1 }}>
@@ -356,9 +375,7 @@ export function SessionScreen({ route, navigation }: Props) {
           <>
             <Button
               label="⚡ Mode Live"
-              onPress={() =>
-                navigation.navigate('MatchLive', { sessionId })
-              }
+              onPress={handleModeLive}
               fullWidth
             />
             <View style={{ height: spacing.sm }} />
