@@ -16,6 +16,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { confirm } from '@/utils/confirm';
 import { formatDate } from '@/utils/date';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -37,6 +38,12 @@ export function SessionsListScreen({ navigation }: Props) {
   }, [sessions, filter]);
 
   const startTraining = async () => {
+    const ok = await confirm({
+      title: 'Nouvel entraînement',
+      message: 'Créer un entraînement pour aujourd\'hui ?',
+      confirmLabel: 'Créer la séance',
+    });
+    if (!ok) return;
     const s = await createSession({ kind: 'training' });
     navigation.navigate('Session', { sessionId: s.id });
   };
