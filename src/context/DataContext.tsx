@@ -50,6 +50,7 @@ type DataContextValue = {
   createSession: (opts?: { kind?: SessionKind; label?: string; date?: string }) => Promise<Session>;
   deleteSession: (id: string) => Promise<void>;
   toggleCancelled: (sessionId: string) => Promise<void>;
+  confirmSession: (sessionId: string) => Promise<void>;
   setAttendance: (sessionId: string, playerId: string, status: AttendanceStatus) => Promise<void>;
   bulkSetAttendance: (sessionId: string, status: AttendanceStatus) => Promise<void>;
   getStatus: (sessionId: string, playerId: string) => AttendanceStatus;
@@ -513,6 +514,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const changed = next.find((s) => s.id === sessionId);
     if (changed) {
       await pushSafe('toggleCancelled', () => remote.upsertSession(changed));
+    }
+  }, [sessions]);
+
+  const confirmSession = useCallback(async (sessionId: string) => {
+    const next = sessions.map((s) =>
+      s.id === sessionId ? { ...s, confirmed: true } : s,
+    );
+    setSessions(next);
+    await db.saveSessions(next);
+    const changed = next.find((s) => s.id === sessionId);
+    if (changed) {
+      await pushSafe('confirmSession', () => remote.upsertSession(changed));
     }
   }, [sessions]);
 
@@ -1281,6 +1294,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     createSession,
     deleteSession,
     toggleCancelled,
+    confirmSession,
     setAttendance,
     bulkSetAttendance,
     getStatus,

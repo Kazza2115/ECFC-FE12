@@ -25,6 +25,7 @@ type DbSession = {
   label: string | null;
   kind: string | null;
   cancelled: boolean | null;
+  confirmed: boolean | null;
   started_at: string | null;
   ended_at: string | null;
   starting_lineup: string[] | null;
@@ -104,6 +105,7 @@ function toDbSession(s: Session): DbSession {
     label: s.label ?? null,
     kind: s.kind ?? 'training',
     cancelled: !!s.cancelled,
+    confirmed: !!s.confirmed,
     started_at: s.startedAt ?? null,
     ended_at: s.endedAt ?? null,
     starting_lineup: s.startingLineup ?? null,
@@ -125,6 +127,7 @@ function fromDbSession(row: DbSession): Session {
     label: row.label ?? undefined,
     kind: (row.kind as Session['kind']) ?? 'training',
     cancelled: !!row.cancelled,
+    confirmed: !!row.confirmed,
     startedAt: row.started_at ?? undefined,
     endedAt: row.ended_at ?? undefined,
     startingLineup: row.starting_lineup ?? undefined,

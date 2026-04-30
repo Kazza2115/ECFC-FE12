@@ -20,7 +20,6 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, spacing, typography } from '@/theme';
-import { confirm } from '@/utils/confirm';
 import { formatDate, nextTrainingDates, sameDay } from '@/utils/date';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -65,13 +64,6 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
   }, [sessions]);
 
   const startTraining = async (iso?: string) => {
-    const dateLabel = iso ? formatDate(iso) : 'aujourd\'hui';
-    const ok = await confirm({
-      title: 'Nouvel entraînement',
-      message: `Créer un entraînement pour ${dateLabel} ?`,
-      confirmLabel: 'Créer la séance',
-    });
-    if (!ok) return;
     const session = await createSession({ kind: 'training', date: iso });
     navigation.navigate('Session', { sessionId: session.id });
   };

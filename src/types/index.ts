@@ -18,6 +18,7 @@ export type Session = {
   label?: string;
   kind?: SessionKind;
   cancelled?: boolean;
+  confirmed?: boolean;
   startedAt?: string;
   endedAt?: string;
   startingLineup?: string[];

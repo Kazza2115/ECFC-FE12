@@ -38,12 +38,6 @@ export function SessionsListScreen({ navigation }: Props) {
   }, [sessions, filter]);
 
   const startTraining = async () => {
-    const ok = await confirm({
-      title: 'Nouvel entraînement',
-      message: 'Créer un entraînement pour aujourd\'hui ?',
-      confirmLabel: 'Créer la séance',
-    });
-    if (!ok) return;
     const s = await createSession({ kind: 'training' });
     navigation.navigate('Session', { sessionId: s.id });
   };

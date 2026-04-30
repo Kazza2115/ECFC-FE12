@@ -41,12 +41,14 @@ export function SessionScreen({ route, navigation }: Props) {
     bulkSetAttendance,
     deleteSession,
     toggleCancelled,
+    confirmSession,
   } = useData();
 
   const session = sessions.find((s) => s.id === sessionId);
   const kind: SessionKind = session?.kind ?? 'training';
   const isMatch = kind === 'match';
   const cancelled = !!session?.cancelled;
+  const isConfirmed = !!session?.confirmed;
 
   const [sheetPlayer, setSheetPlayer] = useState<Player | null>(null);
 
@@ -58,7 +60,8 @@ export function SessionScreen({ route, navigation }: Props) {
 
   const touchedRef = useRef(
     attendances.some((a) => a.sessionId === sessionId) ||
-      !!session?.cancelled,
+      !!session?.cancelled ||
+      !!session?.confirmed,
   );
   const explicitlyDeletedRef = useRef(false);
 
@@ -182,6 +185,34 @@ export function SessionScreen({ route, navigation }: Props) {
           />
         </View>
       </View>
+
+      {!isConfirmed && !cancelled ? (
+        <Pressable
+          onPress={async () => {
+            touchedRef.current = true;
+            try {
+              await Haptics.notificationAsync(
+                Haptics.NotificationFeedbackType.Success,
+              );
+            } catch {}
+            await confirmSession(sessionId);
+          }}
+          style={styles.confirmBanner}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.confirmBannerTitle}>
+              {isMatch ? 'Match à confirmer' : 'Entraînement à confirmer'}
+            </Text>
+            <Text style={styles.confirmBannerHint}>
+              Sans confirmation, la séance sera supprimée en quittant
+              l'écran.
+            </Text>
+          </View>
+          <View style={styles.confirmBannerCta}>
+            <Text style={styles.confirmBannerCtaLabel}>Confirmer</Text>
+          </View>
+        </Pressable>
+      ) : null}
 
       {!cancelled ? (
         <View style={styles.bulkRow}>
@@ -392,6 +423,39 @@ const styles = StyleSheet.create({
   },
   cancelTitle: { ...typography.bodyBold, color: colors.textPrimary },
   cancelHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  confirmBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  confirmBannerTitle: {
+    ...typography.bodyBold,
+    color: '#92400E',
+    fontSize: 14,
+  },
+  confirmBannerHint: {
+    ...typography.caption,
+    color: '#92400E',
+    marginTop: 2,
+  },
+  confirmBannerCta: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    backgroundColor: '#F59E0B',
+  },
+  confirmBannerCtaLabel: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
   bulkRow: {
     flexDirection: 'row',
     gap: spacing.sm,
