@@ -16,7 +16,7 @@ export const STATUS_META: Record<AttendanceStatus, StatusMeta> = {
   present: {
     key: 'present',
     short: 'Pr',
-    label: 'Présent',
+    label: 'Présent au club',
     glyph: '✓',
     color: '#0F7A3B',
     bg: '#D4F3DF',
@@ -46,7 +46,7 @@ export const STATUS_META: Record<AttendanceStatus, StatusMeta> = {
   sfc: {
     key: 'sfc',
     short: 'SFC',
-    label: 'SFC (sélection)',
+    label: 'SFC · pas au club',
     glyph: '★',
     color: '#B45309',
     bg: '#FEF3C7',
@@ -55,11 +55,11 @@ export const STATUS_META: Record<AttendanceStatus, StatusMeta> = {
   },
   return: {
     key: 'return',
-    short: 'RC',
-    label: 'Retour en club',
+    short: 'RSF',
+    label: 'Retour de SFC · pas au club',
     glyph: '↺',
-    color: '#047857',
-    bg: '#D1FAE5',
+    color: '#B45309',
+    bg: '#FEF3C7',
     countsPresent: true,
     primary: false,
   },

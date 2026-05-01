@@ -85,6 +85,7 @@ type DataContextValue = {
   playerStats: PlayerStats[];
   matchCallUps: MatchCallUp[];
   globalRatio: number;
+  globalPresentRatio: number;
   activeTrainingsCount: number;
   activeMatchesCount: number;
   syncStatus: SyncStatus;
@@ -1373,6 +1374,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .sort((a, b) => b.called - a.called);
   }, [players, activeMatches, activeMatchIds, attendances]);
 
+  // "Actif" = Présent au club + SFC + Retour de SFC
   const globalRatio = useMemo(() => {
     if (activeTrainings.length === 0 || players.length === 0) return 0;
     const possible = activeTrainings.length * players.length;
@@ -1380,6 +1382,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     for (const a of attendances) {
       if (!activeTrainingIds.has(a.sessionId)) continue;
       if (STATUS_META[a.status]?.countsPresent) present += 1;
+    }
+    return possible === 0 ? 0 : present / possible;
+  }, [players, activeTrainings, activeTrainingIds, attendances]);
+
+  // "Présent au club" = Présent uniquement (le coach voit qui est
+  // réellement venu à Carouge)
+  const globalPresentRatio = useMemo(() => {
+    if (activeTrainings.length === 0 || players.length === 0) return 0;
+    const possible = activeTrainings.length * players.length;
+    let present = 0;
+    for (const a of attendances) {
+      if (!activeTrainingIds.has(a.sessionId)) continue;
+      if (a.status === 'present') present += 1;
     }
     return possible === 0 ? 0 : present / possible;
   }, [players, activeTrainings, activeTrainingIds, attendances]);
@@ -1472,6 +1487,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     playerStats,
     matchCallUps,
     globalRatio,
+    globalPresentRatio,
     activeTrainingsCount: activeTrainings.length,
     activeMatchesCount: activeMatches.length,
     syncStatus,

@@ -51,6 +51,7 @@ export function StatsScreen() {
     getPlayerMatchTotals,
     getPlayerPlayMs,
     globalRatio,
+    globalPresentRatio,
     activeTrainingsCount,
     activeMatchesCount,
   } = useData();
@@ -148,6 +149,7 @@ export function StatsScreen() {
             <TrainingView
               playerStats={playerStats}
               globalRatio={globalRatio}
+              globalPresentRatio={globalPresentRatio}
               players={players}
               activeTrainingsCount={activeTrainingsCount}
             />
@@ -207,11 +209,13 @@ function TabButton({
 function TrainingView({
   playerStats,
   globalRatio,
+  globalPresentRatio,
   players,
   activeTrainingsCount,
 }: {
   playerStats: ReturnType<typeof useData>['playerStats'];
   globalRatio: number;
+  globalPresentRatio: number;
   players: ReturnType<typeof useData>['players'];
   activeTrainingsCount: number;
 }) {
@@ -232,40 +236,54 @@ function TrainingView({
   return (
     <>
       <Card style={styles.hero}>
-        <View style={styles.heroRow}>
-          <ProgressRing
-            value={globalRatio}
-            size={120}
-            strokeWidth={12}
-            label="global"
-          />
-          <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>Activité</Text>
-            <Text style={styles.heroHint}>
-              {players.length} joueurs · {activeTrainingsCount}{' '}
-              entraînement{activeTrainingsCount > 1 ? 's' : ''}
+        <Text style={styles.heroBigTitle}>Suivi entraînement</Text>
+        <Text style={styles.heroBigSub}>
+          {players.length} joueurs · {activeTrainingsCount}{' '}
+          entraînement{activeTrainingsCount > 1 ? 's' : ''}
+        </Text>
+        <View style={styles.heroDualRow}>
+          <View style={styles.heroMetric}>
+            <ProgressRing
+              value={globalPresentRatio}
+              size={96}
+              strokeWidth={11}
+              color={STATUS_META.present.color}
+              label="au club"
+            />
+            <Text style={styles.heroMetricTitle}>Présents</Text>
+            <Text style={styles.heroMetricSub}>
+              Sur le terrain à Carouge
             </Text>
-            <Text style={styles.heroSubtitle}>
-              Présents au club + SFC + Retour en club
-            </Text>
-            {best ? (
-              <View style={styles.heroMetaRow}>
-                <Text style={styles.heroMetaLabel}>Meilleur</Text>
-                <Text style={styles.heroMetaValue}>
-                  {best.player.name} · {Math.round(best.ratio * 100)}% actif
-                </Text>
-              </View>
-            ) : null}
-            {worst && worst !== best ? (
-              <View style={styles.heroMetaRow}>
-                <Text style={styles.heroMetaLabel}>À encourager</Text>
-                <Text style={styles.heroMetaValue}>
-                  {worst.player.name} · {Math.round(worst.ratio * 100)}% actif
-                </Text>
-              </View>
-            ) : null}
+          </View>
+          <View style={styles.heroMetric}>
+            <ProgressRing
+              value={globalRatio}
+              size={96}
+              strokeWidth={11}
+              color={STATUS_META.sfc.color}
+              label="actif"
+            />
+            <Text style={styles.heroMetricTitle}>Actifs</Text>
+            <Text style={styles.heroMetricSub}>+ SFC + Retour SFC</Text>
           </View>
         </View>
+
+        {best ? (
+          <View style={styles.heroMetaRow}>
+            <Text style={styles.heroMetaLabel}>Meilleur</Text>
+            <Text style={styles.heroMetaValue}>
+              {best.player.name} · {Math.round(best.ratio * 100)}% actif
+            </Text>
+          </View>
+        ) : null}
+        {worst && worst !== best ? (
+          <View style={styles.heroMetaRow}>
+            <Text style={styles.heroMetaLabel}>À encourager</Text>
+            <Text style={styles.heroMetaValue}>
+              {worst.player.name} · {Math.round(worst.ratio * 100)}% actif
+            </Text>
+          </View>
+        ) : null}
       </Card>
 
       <View style={styles.statsRow}>
@@ -1098,6 +1116,34 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  heroBigTitle: { ...typography.h2, color: colors.textPrimary },
+  heroBigSub: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  heroDualRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  heroMetric: {
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  heroMetricTitle: {
+    ...typography.bodyBold,
+    color: colors.textPrimary,
+    fontSize: 15,
+  },
+  heroMetricSub: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
   },
   barWrap: { marginTop: 6 },
   playerMeta: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
