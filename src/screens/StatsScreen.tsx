@@ -240,16 +240,19 @@ function TrainingView({
             label="global"
           />
           <View style={styles.heroText}>
-            <Text style={styles.heroTitle}>Assiduité</Text>
+            <Text style={styles.heroTitle}>Activité</Text>
             <Text style={styles.heroHint}>
               {players.length} joueurs · {activeTrainingsCount}{' '}
               entraînement{activeTrainingsCount > 1 ? 's' : ''}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              Présents au club + SFC + Retour en club
             </Text>
             {best ? (
               <View style={styles.heroMetaRow}>
                 <Text style={styles.heroMetaLabel}>Meilleur</Text>
                 <Text style={styles.heroMetaValue}>
-                  {best.player.name} · {Math.round(best.ratio * 100)}%
+                  {best.player.name} · {Math.round(best.ratio * 100)}% actif
                 </Text>
               </View>
             ) : null}
@@ -257,7 +260,7 @@ function TrainingView({
               <View style={styles.heroMetaRow}>
                 <Text style={styles.heroMetaLabel}>À encourager</Text>
                 <Text style={styles.heroMetaValue}>
-                  {worst.player.name} · {Math.round(worst.ratio * 100)}%
+                  {worst.player.name} · {Math.round(worst.ratio * 100)}% actif
                 </Text>
               </View>
             ) : null}
@@ -267,12 +270,21 @@ function TrainingView({
 
       <View style={styles.statsRow}>
         <StatCard
-          label="Présents"
+          label="Présents au club"
           value={totals.present}
-          hint={`+ ${totals.sfc} SFC · ${totals.ret} RC`}
+          hint="Sur le terrain à Carouge"
           accent={STATUS_META.present.color}
         />
         <View style={{ width: spacing.md }} />
+        <StatCard
+          label="Actifs"
+          value={totals.present + totals.sfc + totals.ret}
+          hint={`+ ${totals.sfc} SFC · ${totals.ret} RC`}
+          accent={STATUS_META.sfc.color}
+        />
+      </View>
+
+      <View style={styles.statsRow}>
         <StatCard
           label="Absences"
           value={totals.excused + totals.unexcused}
@@ -300,15 +312,22 @@ function TrainingView({
                 <Text style={styles.playerName} numberOfLines={1}>
                   {stat.player.name}
                 </Text>
-                <Text style={styles.playerPct}>
-                  {Math.round(stat.ratio * 100)}%
-                </Text>
+                <View style={styles.playerPctBlock}>
+                  <Text style={styles.playerPct}>
+                    {Math.round(stat.ratio * 100)}%
+                  </Text>
+                  <Text style={styles.playerPctSub}>actif</Text>
+                </View>
               </View>
               <View style={styles.barWrap}>
                 <ProgressBar value={stat.ratio} height={6} />
               </View>
               <Text style={styles.playerMeta}>
-                {stat.totalPresent} / {stat.totalSessions}
+                Actif {stat.totalPresent}/{stat.totalSessions} · Présent au club{' '}
+                {stat.present}/{stat.totalSessions}
+                {stat.totalSessions > 0 ? ` (${Math.round(
+                  (stat.present / stat.totalSessions) * 100,
+                )}%)` : ''}
               </Text>
               <View style={styles.miniStats}>
                 {stat.sfc > 0 ? (
@@ -1067,6 +1086,19 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   playerPct: { ...typography.bodyBold, color: colors.primary },
+  playerPctBlock: { alignItems: 'flex-end' },
+  playerPctSub: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontSize: 10,
+    marginTop: -2,
+  },
+  heroSubtitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   barWrap: { marginTop: 6 },
   playerMeta: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
   miniStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
