@@ -37,9 +37,10 @@ function Tabs() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          height: 72,
-          paddingBottom: 10,
-          paddingTop: 8,
+          borderTopWidth: 0.5,
+          height: 84,
+          paddingBottom: 18,
+          paddingTop: 10,
         },
         tabBarShowLabel: false,
       }}

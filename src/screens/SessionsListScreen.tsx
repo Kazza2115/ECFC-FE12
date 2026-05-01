@@ -299,11 +299,11 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: spacing.xs },
   filterChip: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   filterChipActive: {
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   kindBadgeTraining: { backgroundColor: colors.primarySoft },
   kindBadgeMatch: { backgroundColor: '#FEF3C7' },
-  kindBadgeText: { fontSize: 11, fontWeight: '700' },
+  kindBadgeText: { ...typography.micro, fontWeight: '700' },
   kindBadgeTextTraining: { color: colors.primary },
   kindBadgeTextMatch: { color: '#B45309' },
   rowTitle: { ...typography.h3, color: colors.textPrimary },

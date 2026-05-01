@@ -201,18 +201,18 @@ export function PlayersScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   addBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addBtnLabel: {
     color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 22,
-    lineHeight: 24,
+    fontWeight: '700',
+    fontSize: 20,
+    lineHeight: 22,
   },
   emptyWrap: { padding: spacing.lg },
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(255, 59, 48, 0.10)',
   },
   deleteBtnLabel: { color: colors.danger, fontWeight: '700', fontSize: 13 },
   modalOverlay: {

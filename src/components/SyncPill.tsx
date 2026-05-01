@@ -27,7 +27,7 @@ export function SyncPill({ status, lastError, onRefresh }: Props) {
     if (status === 'offline') {
       await notify(
         'Hors ligne',
-        'Impossible de joindre Supabase. Vérifie ta connexion ou que les tables/colonnes sont à jour, puis re-tape la pastille.',
+        'Impossible de joindre Supabase. Vérifie ta connexion ou que les tables / colonnes sont à jour, puis re-tape la pastille.',
       );
       onRefresh();
       return;
@@ -39,7 +39,11 @@ export function SyncPill({ status, lastError, onRefresh }: Props) {
     <Pressable
       onPress={handlePress}
       disabled={status === 'syncing'}
-      style={[styles.pill, { backgroundColor: meta.bg }]}
+      style={({ pressed }) => [
+        styles.pill,
+        { backgroundColor: meta.bg },
+        pressed && { opacity: 0.7 },
+      ]}
     >
       {status === 'syncing' ? (
         <ActivityIndicator color={meta.color} size="small" />
@@ -54,8 +58,8 @@ export function SyncPill({ status, lastError, onRefresh }: Props) {
 const META: Record<SyncStatus, { label: string; color: string; bg: string }> = {
   idle: { label: 'Cloud', color: colors.textMuted, bg: colors.accentSoft },
   syncing: { label: 'Sync…', color: colors.primary, bg: colors.primarySoft },
-  synced: { label: 'Synchronisé', color: colors.success, bg: '#DCFCE7' },
-  offline: { label: 'Hors ligne', color: colors.warning, bg: '#FEF3C7' },
+  synced: { label: 'Synchronisé', color: '#0F7A3B', bg: '#DCFCE7' },
+  offline: { label: 'Hors ligne', color: '#B45309', bg: '#FEF3C7' },
 };
 
 const styles = StyleSheet.create({
@@ -63,10 +67,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 7, height: 7, borderRadius: 4 },
   label: { ...typography.caption, fontWeight: '700' },
 });

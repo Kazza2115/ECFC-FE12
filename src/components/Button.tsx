@@ -50,31 +50,31 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   fullWidth: { alignSelf: 'stretch' },
-  pressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  disabled: { opacity: 0.5 },
-  label: { ...typography.bodyBold },
+  pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
+  disabled: { opacity: 0.4 },
+  label: {
+    ...typography.bodyBold,
+    fontSize: 16,
+    letterSpacing: -0.2,
+  },
   icon: { marginRight: 2 },
 });
 
 const variantStyles: Record<Variant, { container: object; label: object }> = {
   primary: {
     container: { backgroundColor: colors.primary },
-    label: { color: '#FFFFFF' },
+    label: { color: '#FFFFFF', fontWeight: '700' },
   },
   secondary: {
-    container: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    label: { color: colors.textPrimary },
+    container: { backgroundColor: colors.accentSoft },
+    label: { color: colors.primary, fontWeight: '600' },
   },
   ghost: {
     container: { backgroundColor: 'transparent' },
-    label: { color: colors.primary },
+    label: { color: colors.primary, fontWeight: '600' },
   },
   danger: {
     container: { backgroundColor: colors.danger },
-    label: { color: '#FFFFFF' },
+    label: { color: '#FFFFFF', fontWeight: '700' },
   },
 };

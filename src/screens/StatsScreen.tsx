@@ -930,11 +930,11 @@ const styles = StyleSheet.create({
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   tabActive: {

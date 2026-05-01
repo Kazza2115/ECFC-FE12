@@ -1,20 +1,35 @@
+// iOS-aligned design tokens. Avoids harsh shadows and contrast on
+// purpose — the app should feel light, modern and Apple-like.
+
 export const colors = {
+  // Brand
   primary: '#1E40AF',
   primaryDark: '#172E66',
-  primarySoft: '#DBEAFE',
+  primarySoft: '#E5EDFC',
   accent: '#000000',
-  accentSoft: '#F3F4F6',
+  accentSoft: '#F2F2F7',
   gold: '#F4C430',
-  background: '#F7F8FA',
+
+  // Surfaces (iOS systemGroupedBackground / secondarySystemBackground)
+  background: '#F2F2F7',
   surface: '#FFFFFF',
-  border: '#ECEFF3',
-  textPrimary: '#111827',
-  textSecondary: '#6B7280',
-  textMuted: '#9CA3AF',
-  success: '#16A34A',
-  danger: '#DC2626',
-  warning: '#F59E0B',
-  overlay: 'rgba(17, 24, 39, 0.45)',
+  surfaceMuted: '#F9F9FB',
+  border: '#E5E5EA',
+
+  // Text (iOS label / secondaryLabel / tertiaryLabel)
+  textPrimary: '#000000',
+  textSecondary: '#3C3C4399',
+  textMuted: '#8E8E93',
+  textDisabled: '#C7C7CC',
+
+  // Semantics (iOS system colors)
+  success: '#34C759',
+  danger: '#FF3B30',
+  warning: '#FF9500',
+  info: '#5AC8FA',
+
+  // Misc
+  overlay: 'rgba(0, 0, 0, 0.4)',
 };
 
 export const spacing = {
@@ -27,36 +42,72 @@ export const spacing = {
 };
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: 10,
+  md: 14,
+  lg: 18,
   xl: 24,
   pill: 999,
 };
 
 export const typography = {
-  h1: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.5 },
-  h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.3 },
-  h3: { fontSize: 18, fontWeight: '600' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  bodyBold: { fontSize: 15, fontWeight: '600' as const },
-  caption: { fontSize: 12, fontWeight: '500' as const },
-  number: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1 },
+  // iOS Large Title style — used at the top of the main screens.
+  largeTitle: {
+    fontSize: 34,
+    fontWeight: '800' as const,
+    letterSpacing: -0.8,
+  },
+  h1: {
+    fontSize: 28,
+    fontWeight: '800' as const,
+    letterSpacing: -0.6,
+  },
+  h2: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    letterSpacing: -0.3,
+  },
+  h3: {
+    fontSize: 17,
+    fontWeight: '600' as const,
+    letterSpacing: -0.2,
+  },
+  body: {
+    fontSize: 15,
+    fontWeight: '400' as const,
+  },
+  bodyBold: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  caption: {
+    fontSize: 13,
+    fontWeight: '500' as const,
+  },
+  micro: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    letterSpacing: 0.2,
+  },
+  number: {
+    fontSize: 34,
+    fontWeight: '800' as const,
+    letterSpacing: -1,
+  },
 };
 
 export const shadow = {
   card: {
-    shadowColor: '#0B0F19',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 1,
   },
   floating: {
-    shadowColor: '#0B0F19',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    elevation: 4,
   },
 };

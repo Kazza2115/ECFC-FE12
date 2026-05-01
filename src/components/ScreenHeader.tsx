@@ -23,13 +23,17 @@ export function ScreenHeader({ title, subtitle, right }: Props) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
     paddingBottom: spacing.md,
   },
   text: { flex: 1, paddingRight: spacing.md },
-  title: { ...typography.h1, color: colors.textPrimary },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
+  title: { ...typography.largeTitle, color: colors.textPrimary },
+  subtitle: {
+    ...typography.body,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
 });

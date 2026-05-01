@@ -104,9 +104,9 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.subtitle}>Étoile Carouge FC</Text>
             <Text style={styles.greeting}>Bonjour Coach</Text>
-            <Text style={styles.subtitle}>Étoile Carouge FC · Juniors</Text>
           </View>
           <View style={styles.headerRight}>
             <SyncPill
@@ -114,15 +114,15 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               lastError={lastSyncError}
               onRefresh={refreshFromCloud}
             />
-            <ClubLogo size={48} />
+            <ClubLogo size={44} />
           </View>
         </View>
 
         <Card style={styles.heroCard}>
           <View style={styles.heroRow}>
-            <ProgressRing value={globalRatio} size={110} strokeWidth={10} label="global" />
+            <ProgressRing value={globalRatio} size={104} strokeWidth={10} label="actif" />
             <View style={styles.heroText}>
-              <Text style={styles.heroTitle}>Taux de présence</Text>
+              <Text style={styles.heroTitle}>Taux d'activité</Text>
               <Text style={styles.heroHint}>
                 {activeTrainingsCount === 0
                   ? 'Lancez votre premier entraînement'
@@ -131,7 +131,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               {lastSession ? (
                 <Text style={styles.heroMeta}>
                   Dernière {isMatchKind(lastSession.kind) ? 'convocation' : 'séance'} : {formatDate(lastSession.date)}
-                  {lastSession.cancelled ? ' (annulée)' : ''}
+                  {lastSession.cancelled ? ' · annulée' : ''}
                 </Text>
               ) : null}
             </View>
@@ -158,7 +158,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               <Button
                 label="Entraînement"
                 onPress={() => startTraining()}
-                icon={<Text style={styles.actionGlyph}>＋</Text>}
+                icon={<Text style={styles.actionGlyphLight}>＋</Text>}
                 fullWidth
               />
             </View>
@@ -168,14 +168,14 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
                 label="Match"
                 onPress={openMatchModal}
                 variant="secondary"
-                icon={<Text style={styles.actionGlyphDark}>⚽</Text>}
+                icon={<Text style={styles.actionGlyph}>⚽</Text>}
                 fullWidth
               />
             </View>
           </View>
-          <View style={{ height: spacing.sm }} />
+          <View style={{ height: spacing.xs }} />
           <Button
-            label="Voir toutes les séances"
+            label="Toutes les séances"
             onPress={() => navigation.navigate('Sessions')}
             variant="ghost"
             fullWidth
@@ -325,45 +325,50 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  content: { paddingBottom: spacing.xl },
+  content: { paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
   },
-  greeting: { ...typography.h1, color: colors.textPrimary },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: 2 },
+  greeting: { ...typography.largeTitle, color: colors.textPrimary, marginTop: 2 },
+  subtitle: {
+    ...typography.micro,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.sm },
+  heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.xs },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
-  heroTitle: { ...typography.h3, color: colors.textPrimary },
-  heroHint: { ...typography.body, color: colors.textSecondary, marginTop: 4 },
-  heroMeta: { ...typography.caption, color: colors.textMuted, marginTop: 8 },
+  heroTitle: { ...typography.h2, color: colors.textPrimary },
+  heroHint: { ...typography.body, color: colors.textMuted, marginTop: 4 },
+  heroMeta: { ...typography.caption, color: colors.textMuted, marginTop: 10 },
   statsRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
     marginTop: spacing.md,
   },
   actions: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
-  actionsRow: { flexDirection: 'row' },
+  actionsRow: { flexDirection: 'row', gap: spacing.sm },
   actionCol: { flex: 1 },
-  actionGlyph: { color: '#FFFFFF', fontSize: 18, fontWeight: '800' },
-  actionGlyphDark: { color: colors.textPrimary, fontSize: 16 },
+  actionGlyphLight: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+  actionGlyph: { color: colors.primary, fontSize: 17 },
   upcomingBlock: {
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
   },
   sectionLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    ...typography.micro,
+    color: colors.textMuted,
     textTransform: 'uppercase',
     marginBottom: spacing.sm,
   },

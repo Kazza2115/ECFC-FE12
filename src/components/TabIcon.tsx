@@ -14,9 +14,25 @@ export function TabIcon({ focused, glyph, label }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { alignItems: 'center', justifyContent: 'center', minWidth: 64 },
-  glyph: { fontSize: 20, color: colors.textMuted, marginBottom: 2 },
+  wrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 64,
+    paddingTop: 4,
+  },
+  glyph: {
+    fontSize: 22,
+    color: colors.textMuted,
+    marginBottom: 2,
+  },
   glyphActive: { color: colors.primary },
-  label: { ...typography.caption, color: colors.textMuted },
-  labelActive: { color: colors.primary, fontWeight: '700' },
+  label: {
+    ...typography.micro,
+    color: colors.textMuted,
+    fontSize: 10,
+  },
+  labelActive: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
 });
