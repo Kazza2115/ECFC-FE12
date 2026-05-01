@@ -7,7 +7,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
 type Props = {
   visible: boolean;
@@ -17,6 +18,7 @@ type Props = {
 };
 
 export function BottomSheet({ visible, title, onClose, children }: Props) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <Modal
       visible={visible}
@@ -37,34 +39,35 @@ export function BottomSheet({ visible, title, onClose, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: colors.border,
-    marginBottom: spacing.md,
-  },
-  title: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  content: {
-    paddingBottom: spacing.sm,
-  },
-});
+const makeStyles = (c: ThemedColors) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: c.overlay,
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      paddingTop: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.md,
+    },
+    handle: {
+      alignSelf: 'center',
+      width: 40,
+      height: 5,
+      borderRadius: 3,
+      backgroundColor: c.border,
+      marginBottom: spacing.md,
+    },
+    title: {
+      ...typography.h3,
+      color: c.textPrimary,
+      marginBottom: spacing.md,
+    },
+    content: {
+      paddingBottom: spacing.sm,
+    },
+  });

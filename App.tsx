@@ -1,35 +1,43 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  DarkTheme,
+} from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { DataProvider, useData } from '@/context/DataContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { colors } from '@/theme';
 
-const navTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: colors.background,
-    card: colors.surface,
-    text: colors.textPrimary,
-    border: colors.border,
-    primary: colors.primary,
-  },
-};
-
 function Shell() {
   const { loading } = useData();
+  const { effective, version } = useTheme();
+
+  const navTheme = {
+    ...(effective === 'dark' ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(effective === 'dark' ? DarkTheme : DefaultTheme).colors,
+      background: colors.background,
+      card: colors.surface,
+      text: colors.textPrimary,
+      border: colors.border,
+      primary: colors.primary,
+    },
+  };
+
   if (loading) {
     return (
-      <View style={styles.loading}>
+      <View style={[styles.loading, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
   }
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer key={version} theme={navTheme}>
+      <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
       <AppNavigator />
     </NavigationContainer>
   );
@@ -38,10 +46,11 @@ function Shell() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <DataProvider>
-        <Shell />
-      </DataProvider>
+      <ThemeProvider>
+        <DataProvider>
+          <Shell />
+        </DataProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -49,7 +58,6 @@ export default function App() {
 const styles = StyleSheet.create({
   loading: {
     flex: 1,
-    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
   },

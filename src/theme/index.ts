@@ -1,36 +1,39 @@
 // iOS-aligned design tokens. Avoids harsh shadows and contrast on
 // purpose — the app should feel light, modern and Apple-like.
+//
+// `colors` and `shadow` are mutable objects: when the user toggles
+// night mode, ThemeProvider rewrites them in place via Object.assign
+// and bumps a key on the navigator so every StyleSheet.create snapshots
+// the new palette.
 
-export const colors = {
-  // Brand
-  primary: '#1E40AF',
-  primaryDark: '#172E66',
-  primarySoft: '#E5EDFC',
-  accent: '#000000',
-  accentSoft: '#F2F2F7',
-  gold: '#F4C430',
+import {
+  type Palette,
+  type ShadowPalette,
+  lightPalette,
+  darkPalette,
+  lightShadow,
+  darkShadow,
+} from './palettes';
 
-  // Surfaces (iOS systemGroupedBackground / secondarySystemBackground)
-  background: '#F2F2F7',
-  surface: '#FFFFFF',
-  surfaceMuted: '#F9F9FB',
-  border: '#E5E5EA',
+export type ThemeMode = 'light' | 'dark';
 
-  // Text (iOS label / secondaryLabel / tertiaryLabel)
-  textPrimary: '#000000',
-  textSecondary: '#3C3C4399',
-  textMuted: '#8E8E93',
-  textDisabled: '#C7C7CC',
+export const colors: Palette = { ...lightPalette };
+export const shadow: ShadowPalette = JSON.parse(JSON.stringify(lightShadow));
 
-  // Semantics (iOS system colors)
-  success: '#34C759',
-  danger: '#FF3B30',
-  warning: '#FF9500',
-  info: '#5AC8FA',
+let activeMode: ThemeMode = 'light';
 
-  // Misc
-  overlay: 'rgba(0, 0, 0, 0.4)',
-};
+export function applyPalette(mode: ThemeMode): void {
+  activeMode = mode;
+  const palette = mode === 'dark' ? darkPalette : lightPalette;
+  const shadowSet = mode === 'dark' ? darkShadow : lightShadow;
+  Object.assign(colors, palette);
+  Object.assign(shadow.card, shadowSet.card);
+  Object.assign(shadow.floating, shadowSet.floating);
+}
+
+export function getActiveMode(): ThemeMode {
+  return activeMode;
+}
 
 export const spacing = {
   xs: 4,
@@ -50,7 +53,6 @@ export const radius = {
 };
 
 export const typography = {
-  // iOS Large Title style — used at the top of the main screens.
   largeTitle: {
     fontSize: 34,
     fontWeight: '800' as const,
@@ -92,22 +94,5 @@ export const typography = {
     fontSize: 34,
     fontWeight: '800' as const,
     letterSpacing: -1,
-  },
-};
-
-export const shadow = {
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 1,
-  },
-  floating: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 4,
   },
 };

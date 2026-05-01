@@ -9,7 +9,8 @@ import {
 import Svg, { Circle, Line, Rect } from 'react-native-svg';
 import { Avatar } from './Avatar';
 import { POSITION_META } from '@/constants/positions';
-import { colors, radius, typography } from '@/theme';
+import { radius, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import type { Formation, FormationSlot } from '@/constants/formations';
 import type { Player } from '@/types';
 
@@ -30,6 +31,7 @@ export function FormationPitch({
   onSlotPress,
   readOnly,
 }: Props) {
+  const styles = useThemedStyles(makeStyles);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -221,7 +223,7 @@ function lastName(fullName: string): string {
 
 const SLOT_SIZE = 38;
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
   outer: {
     width: '100%',
     alignItems: 'center',
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
     height: SLOT_SIZE,
     borderRadius: SLOT_SIZE / 2,
     borderWidth: 3,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

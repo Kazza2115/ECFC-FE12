@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '@/theme';
+import { radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
 type Props = {
   title: string;
@@ -15,6 +16,7 @@ export function EmptyState({
   glyph = '·',
   children,
 }: Props) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.wrapper}>
       <View style={styles.badge}>
@@ -27,39 +29,40 @@ export function EmptyState({
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  badge: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.lg,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  badgeGlyph: {
-    fontSize: 26,
-    color: colors.primary,
-    fontWeight: '800',
-  },
-  title: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  description: {
-    ...typography.body,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-    lineHeight: 22,
-  },
-  actions: {
-    marginTop: spacing.lg,
-    alignSelf: 'stretch',
-  },
-});
+const makeStyles = (c: ThemedColors) =>
+  StyleSheet.create({
+    wrapper: {
+      alignItems: 'center',
+      padding: spacing.lg,
+    },
+    badge: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.lg,
+      backgroundColor: c.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.md,
+    },
+    badgeGlyph: {
+      fontSize: 26,
+      color: c.primary,
+      fontWeight: '800',
+    },
+    title: {
+      ...typography.h3,
+      color: c.textPrimary,
+      textAlign: 'center',
+    },
+    description: {
+      ...typography.body,
+      color: c.textMuted,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 22,
+    },
+    actions: {
+      marginTop: spacing.lg,
+      alignSelf: 'stretch',
+    },
+  });

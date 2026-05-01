@@ -16,11 +16,13 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { ClubLogo } from '@/components/ClubLogo';
 import { SyncPill } from '@/components/SyncPill';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
 import { StatCard } from '@/components/StatCard';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { formatDate, nextTrainingDates, sameDay } from '@/utils/date';
 import { notify } from '@/utils/confirm';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -46,6 +48,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     lastSyncError,
     refreshFromCloud,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
@@ -114,6 +117,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               lastError={lastSyncError}
               onRefresh={refreshFromCloud}
             />
+            <ThemeToggle />
             <ClubLogo size={44} />
           </View>
         </View>
@@ -323,8 +327,8 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   content: { paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
@@ -335,10 +339,10 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  greeting: { ...typography.largeTitle, color: colors.textPrimary, marginTop: 2 },
+  greeting: { ...typography.largeTitle, color: c.textPrimary, marginTop: 2 },
   subtitle: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
   },
   headerRight: {
@@ -349,9 +353,9 @@ const styles = StyleSheet.create({
   heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.xs },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
-  heroTitle: { ...typography.h2, color: colors.textPrimary },
-  heroHint: { ...typography.body, color: colors.textMuted, marginTop: 4 },
-  heroMeta: { ...typography.caption, color: colors.textMuted, marginTop: 10 },
+  heroTitle: { ...typography.h2, color: c.textPrimary },
+  heroHint: { ...typography.body, color: c.textMuted, marginTop: 4 },
+  heroMeta: { ...typography.caption, color: c.textMuted, marginTop: 10 },
   statsRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
@@ -360,15 +364,15 @@ const styles = StyleSheet.create({
   actions: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   actionsRow: { flexDirection: 'row', gap: spacing.sm },
   actionCol: { flex: 1 },
-  actionGlyphLight: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
-  actionGlyph: { color: colors.primary, fontSize: 17 },
+  actionGlyphLight: { color: c.onPrimary, fontSize: 17, fontWeight: '800' },
+  actionGlyph: { color: c.primary, fontSize: 17 },
   upcomingBlock: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.xl,
   },
   sectionLabel: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
     marginBottom: spacing.sm,
   },
@@ -377,9 +381,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
   },
-  chipLabel: { color: colors.primary, fontWeight: '700' },
+  chipLabel: { color: c.primary, fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -388,8 +392,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
     marginBottom: spacing.sm,
   },
-  sectionTitle: { ...typography.h3, color: colors.textPrimary },
-  link: { ...typography.bodyBold, color: colors.primary },
+  sectionTitle: { ...typography.h3, color: c.textPrimary },
+  link: { ...typography.bodyBold, color: c.primary },
   listCard: { marginHorizontal: spacing.lg },
   playerRow: {
     flexDirection: 'row',
@@ -400,54 +404,54 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
   },
   rankBadge: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rankText: { ...typography.caption, color: colors.primary, fontWeight: '800' },
+  rankText: { ...typography.caption, color: c.primary, fontWeight: '800' },
   playerInfo: { flex: 1, minWidth: 0 },
-  playerName: { ...typography.bodyBold, color: colors.textPrimary },
+  playerName: { ...typography.bodyBold, color: c.textPrimary },
   barWrapper: { marginTop: 6 },
   playerPct: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     minWidth: 44,
     textAlign: 'right',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: c.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
   },
   modalCard: { width: '100%', maxWidth: 420 },
-  modalTitle: { ...typography.h3, color: colors.textPrimary },
+  modalTitle: { ...typography.h3, color: c.textPrimary },
   modalHint: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 4,
     marginBottom: spacing.md,
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     ...typography.body,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
+    color: c.textPrimary,
+    backgroundColor: c.background,
   },
   formatLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     fontWeight: '800',
     marginTop: spacing.md,
@@ -459,22 +463,22 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: c.border,
+    backgroundColor: c.background,
   },
   formatOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+    borderColor: c.primary,
+    backgroundColor: c.primarySoft,
   },
   formatOptionTitle: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
-  formatOptionTitleActive: { color: colors.primary },
+  formatOptionTitleActive: { color: c.primary },
   formatOptionSub: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   modalActions: {

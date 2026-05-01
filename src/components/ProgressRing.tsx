@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
 type Props = {
   value: number;
@@ -18,6 +19,7 @@ export function ProgressRing({
   label,
   color,
 }: Props) {
+  const styles = useThemedStyles(makeStyles);
   const clamped = Math.max(0, Math.min(1, value));
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -64,16 +66,17 @@ export function ProgressRing({
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  center: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  percent: { ...typography.h2, color: colors.textPrimary },
-  label: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-});
+const makeStyles = (c: ThemedColors) =>
+  StyleSheet.create({
+    wrapper: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    center: {
+      position: 'absolute',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    percent: { ...typography.h2, color: c.textPrimary },
+    label: { ...typography.caption, color: c.textSecondary, marginTop: 2 },
+  });

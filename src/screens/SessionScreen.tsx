@@ -22,6 +22,7 @@ import {
 } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { formatDate } from '@/utils/date';
 import { confirm, notify } from '@/utils/confirm';
 import type { AttendanceStatus, Player, SessionKind } from '@/types';
@@ -44,6 +45,7 @@ export function SessionScreen({ route, navigation }: Props) {
     toggleCancelled,
     setSessionConfirmed,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const session = sessions.find((s) => s.id === sessionId);
   const kind: SessionKind = session?.kind ?? 'training';
@@ -431,16 +433,16 @@ export function SessionScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  muted: { ...typography.body, color: colors.textMuted },
+  muted: { ...typography.body, color: c.textMuted },
   topBar: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
     gap: spacing.sm,
   },
   topRow: {
@@ -452,27 +454,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
   },
-  kindBadgeText: { ...typography.micro, color: colors.primary, fontWeight: '700' },
-  opponent: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
+  kindBadgeText: { ...typography.micro, color: c.primary, fontWeight: '700' },
+  opponent: { ...typography.bodyBold, color: c.textPrimary, flexShrink: 1 },
   summaryBlock: {
     alignItems: 'flex-end',
   },
-  summaryValue: { ...typography.h1, color: colors.textPrimary },
-  summaryDivider: { color: colors.textMuted, fontSize: 16, fontWeight: '600' },
-  summaryLabel: { ...typography.caption, color: colors.textMuted, marginTop: -2 },
+  summaryValue: { ...typography.h1, color: c.textPrimary },
+  summaryDivider: { color: c.textMuted, fontSize: 16, fontWeight: '600' },
+  summaryLabel: { ...typography.caption, color: c.textMuted, marginTop: -2 },
   cancelBlock: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  cancelTitle: { ...typography.bodyBold, color: colors.textPrimary },
-  cancelHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  cancelTitle: { ...typography.bodyBold, color: c.textPrimary },
+  cancelHint: { ...typography.caption, color: c.textMuted, marginTop: 2 },
   confirmBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -481,25 +483,25 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(255, 149, 0, 0.10)',
+    backgroundColor: c.warningSoft,
   },
   confirmBannerTitle: {
     ...typography.bodyBold,
-    color: '#B45309',
+    color: c.warningText,
   },
   confirmBannerHint: {
     ...typography.caption,
-    color: '#B45309',
+    color: c.warningText,
     marginTop: 2,
   },
   confirmBannerCta: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: colors.warning,
+    backgroundColor: c.warning,
   },
   confirmBannerCtaLabel: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '700',
     fontSize: 13,
   },
@@ -511,22 +513,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: 'rgba(52, 199, 89, 0.10)',
+    backgroundColor: c.successSoft,
   },
   confirmedGlyph: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F7A3B',
+    color: c.successText,
     width: 24,
     textAlign: 'center',
   },
   confirmedTitle: {
     ...typography.bodyBold,
-    color: '#0F7A3B',
+    color: c.successText,
   },
   confirmedHint: {
     ...typography.caption,
-    color: '#0F7A3B',
+    color: c.successText,
     marginTop: 2,
   },
   confirmedUndo: {
@@ -536,7 +538,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   confirmedUndoLabel: {
-    color: '#0F7A3B',
+    color: c.successText,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -550,12 +552,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 11,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
   },
-  bulkChipGhost: { backgroundColor: colors.accentSoft },
-  bulkLabel: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  bulkLabelGhost: { color: colors.primary },
+  bulkChipGhost: { backgroundColor: c.accentSoft },
+  bulkLabel: { color: c.onPrimary, fontWeight: '600', fontSize: 14 },
+  bulkLabelGhost: { color: c.primary },
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   row: {
     flexDirection: 'row',
@@ -569,7 +571,7 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, minWidth: 0 },
   rowName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   rowNameDisabled: { textDecorationLine: 'line-through' },
@@ -577,7 +579,7 @@ const styles = StyleSheet.create({
   segmented: {
     flexDirection: 'row',
     gap: 4,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     padding: 3,
   },
@@ -593,7 +595,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   sheetGrid: {
     flexDirection: 'row',
@@ -614,7 +616,7 @@ const styles = StyleSheet.create({
   sheetGlyph: { fontSize: 18, fontWeight: '800' },
   sheetLabel: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     flexShrink: 1,
   },
 });

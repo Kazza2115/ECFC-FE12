@@ -5,6 +5,7 @@ import { BottomSheet } from './BottomSheet';
 import { Button } from './Button';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm, notify } from '@/utils/confirm';
 import type { SavedTeam } from '@/types';
 
@@ -37,6 +38,7 @@ export function TeamLibrarySheet({
     deleteSavedTeam,
     players,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
   const [name, setName] = useState('');
 
   const visibleTeams = formationFilter
@@ -159,13 +161,13 @@ export function TeamLibrarySheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
   section: {
     marginBottom: spacing.lg,
   },
   label: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '800',
     textTransform: 'uppercase',
     marginBottom: spacing.sm,
@@ -178,27 +180,27 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surfaceMuted,
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   saveBtn: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnLabel: { fontSize: 18 },
-  hint: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
-  muted: { ...typography.body, color: colors.textMuted },
+  hint: { ...typography.caption, color: c.textMuted, marginTop: 4 },
+  muted: { ...typography.body, color: c.textMuted },
   teamCard: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
@@ -209,29 +211,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  teamName: { ...typography.bodyBold, color: colors.textPrimary, fontSize: 15 },
+  teamName: { ...typography.bodyBold, color: c.textPrimary, fontSize: 15 },
   teamMeta: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   applyBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
   },
-  applyBtnLabel: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+  applyBtnLabel: { color: c.onPrimary, fontWeight: '800', fontSize: 13 },
   deleteBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(220, 38, 38, 0.08)',
+    backgroundColor: c.dangerSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   deleteBtnLabel: {
-    color: colors.danger,
+    color: c.danger,
     fontWeight: '800',
     fontSize: 20,
     lineHeight: 20,
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
   },
   moreLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '700',
   },
 });

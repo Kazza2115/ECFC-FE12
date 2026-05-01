@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm } from '@/utils/confirm';
 import { pickPlayerPhoto } from '@/utils/photo';
 
@@ -27,6 +28,7 @@ export function PlayersScreen() {
     renamePlayer,
     setPlayerPhoto,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -198,18 +200,18 @@ export function PlayersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   addBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addBtnLabel: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '700',
     fontSize: 20,
     lineHeight: 22,
@@ -232,9 +234,9 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: c.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -242,20 +244,20 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   rowName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
   },
-  rowHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  rowHint: { ...typography.caption, color: c.textMuted, marginTop: 2 },
   deleteBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255, 59, 48, 0.10)',
+    backgroundColor: c.dangerSoft,
   },
-  deleteBtnLabel: { color: colors.danger, fontWeight: '700', fontSize: 13 },
+  deleteBtnLabel: { color: c.danger, fontWeight: '700', fontSize: 13 },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: c.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
@@ -263,18 +265,18 @@ const styles = StyleSheet.create({
   modalCard: { width: '100%', maxWidth: 420 },
   modalTitle: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginBottom: spacing.md,
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     ...typography.body,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
+    color: c.textPrimary,
+    backgroundColor: c.background,
   },
   modalActions: {
     flexDirection: 'row',

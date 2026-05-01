@@ -13,6 +13,7 @@ import { EVENT_META } from '@/constants/events';
 import { POSITION_META } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { formatLongDate } from '@/utils/date';
 import type { MatchEvent, PlayerPosition, PlayerStint } from '@/types';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -46,6 +47,7 @@ export function MatchSheetScreen({ route, navigation }: Props) {
     getPlayerMatchTotals,
     getPlayerPlayMs,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const session = sessions.find((s) => s.id === sessionId);
   const events = useMemo(
@@ -376,6 +378,7 @@ function hasAnyEvent(totals: {
 }
 
 function MetaChip({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.metaChip}>
       <Text style={styles.metaLabel}>{label}</Text>
@@ -391,6 +394,7 @@ function EventTotal({
   type: keyof typeof EVENT_META;
   value: number;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const meta = EVENT_META[type];
   return (
     <View style={[styles.eventTotal, { backgroundColor: meta.bg }]}>
@@ -411,6 +415,7 @@ function MiniEvent({
   color: string;
   value: number;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.miniEvent, { borderColor: color + '44' }]}>
       <Text style={styles.miniEventGlyph}>{glyph}</Text>
@@ -430,6 +435,7 @@ function TimelineRow({
   last: boolean;
   start?: string;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const meta = EVENT_META[event.type];
   const player = players.find((p) => p.id === event.playerId);
   const minute = start
@@ -476,6 +482,7 @@ function StintRow({
   is7x7?: boolean;
   quarterStarts?: Map<number, number>;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const player = players.find((p) => p.id === stint.playerId);
   const start = new Date(stint.startAt).getTime();
   let end = stint.endAt ? new Date(stint.endAt).getTime() : nowMs;
@@ -510,18 +517,18 @@ function StintRow({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  muted: { ...typography.body, color: colors.textMuted },
+  muted: { ...typography.body, color: c.textMuted },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   header: {},
   date: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
   },
-  title: { ...typography.largeTitle, color: colors.textPrimary, marginTop: 4 },
+  title: { ...typography.largeTitle, color: c.textPrimary, marginTop: 4 },
   headerMetaRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -529,16 +536,16 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   metaChip: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     padding: spacing.sm,
     flex: 1,
     minWidth: 90,
   },
-  metaLabel: { ...typography.micro, color: colors.textMuted, textTransform: 'uppercase' },
+  metaLabel: { ...typography.micro, color: c.textMuted, textTransform: 'uppercase' },
   metaValue: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: 2,
   },
   eventTotalsRow: {
@@ -557,7 +564,7 @@ const styles = StyleSheet.create({
   eventTotalValue: { ...typography.h2, fontSize: 20, marginTop: 2 },
   sectionHeader: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: spacing.sm,
   },
   playerRow: {
@@ -568,7 +575,7 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
   },
   playerInfo: { flex: 1, minWidth: 0, gap: 6 },
   playerTopRow: {
@@ -578,26 +585,26 @@ const styles = StyleSheet.create({
   },
   playerName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
     flex: 1,
     marginRight: spacing.sm,
   },
   playerTime: {
     ...typography.bodyBold,
-    color: colors.primary,
+    color: c.primary,
     fontVariant: ['tabular-nums'],
   },
   playerSubRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   starterPill: {
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
   starterLabel: {
     ...typography.micro,
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '700',
   },
   positionPill: {
@@ -626,7 +633,7 @@ const styles = StyleSheet.create({
   },
   timelineMinute: {
     minWidth: 44,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: radius.sm,
@@ -635,14 +642,14 @@ const styles = StyleSheet.create({
   timelineMinuteLabel: {
     ...typography.bodyBold,
     fontSize: 13,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontVariant: ['tabular-nums'],
   },
   timelineGlyph: { fontSize: 22 },
-  timelineName: { ...typography.bodyBold, color: colors.textPrimary },
+  timelineName: { ...typography.bodyBold, color: c.textPrimary },
   timelineMeta: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 2,
   },
   stintRow: {
@@ -651,8 +658,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
   },
-  stintName: { ...typography.bodyBold, color: colors.textPrimary },
-  stintMeta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  stintName: { ...typography.bodyBold, color: c.textPrimary },
+  stintMeta: { ...typography.caption, color: c.textMuted, marginTop: 2 },
   stintPos: {
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -661,7 +668,7 @@ const styles = StyleSheet.create({
   stintPosLabel: { ...typography.micro, fontWeight: '700' },
   stintDuration: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontVariant: ['tabular-nums'],
   },
 });

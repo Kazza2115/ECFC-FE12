@@ -17,6 +17,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm, notify } from '@/utils/confirm';
 import { formatDate } from '@/utils/date';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -28,6 +29,7 @@ type Filter = 'all' | 'training' | 'match';
 
 export function SessionsListScreen({ navigation }: Props) {
   const { sessions, players, getSessionAttendance, createSession } = useData();
+  const styles = useThemedStyles(makeStyles);
   const [filter, setFilter] = useState<Filter>('all');
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
@@ -293,25 +295,25 @@ export function SessionsListScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   content: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   filterRow: { flexDirection: 'row', gap: spacing.xs },
   filterChip: {
     flex: 1,
     paddingVertical: 9,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
-  filterLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: '700' },
-  filterLabelActive: { color: '#FFFFFF' },
+  filterLabel: { ...typography.caption, color: c.textSecondary, fontWeight: '700' },
+  filterLabelActive: { color: c.onPrimary },
   quickActions: { flexDirection: 'row' },
   row: {},
   rowCancelled: { opacity: 0.6 },
@@ -328,26 +330,26 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  kindBadgeTraining: { backgroundColor: colors.primarySoft },
-  kindBadgeMatch: { backgroundColor: '#FEF3C7' },
+  kindBadgeTraining: { backgroundColor: c.primarySoft },
+  kindBadgeMatch: { backgroundColor: c.warningSoft },
   kindBadgeText: { ...typography.micro, fontWeight: '700' },
-  kindBadgeTextTraining: { color: colors.primary },
-  kindBadgeTextMatch: { color: '#B45309' },
-  rowTitle: { ...typography.h3, color: colors.textPrimary },
+  kindBadgeTextTraining: { color: c.primary },
+  kindBadgeTextMatch: { color: c.warningText },
+  rowTitle: { ...typography.h3, color: c.textPrimary },
   rowTitleCancelled: { textDecorationLine: 'line-through' },
-  rowPct: { ...typography.bodyBold, color: colors.primary },
-  rowLabel: { ...typography.body, color: colors.textPrimary, marginTop: 2 },
-  rowMeta: { ...typography.caption, color: colors.textSecondary, marginTop: 4 },
+  rowPct: { ...typography.bodyBold, color: c.primary },
+  rowLabel: { ...typography.body, color: c.textPrimary, marginTop: 2 },
+  rowMeta: { ...typography.caption, color: c.textSecondary, marginTop: 4 },
   barWrap: { marginTop: spacing.sm },
   cancelPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.border,
+    backgroundColor: c.border,
   },
   cancelPillLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '700',
   },
   draftPill: {
@@ -355,12 +357,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: c.warningSoft,
     marginTop: 4,
   },
   draftPillLabel: {
     ...typography.caption,
-    color: '#92400E',
+    color: c.warningText,
     fontWeight: '800',
     fontSize: 11,
   },
@@ -369,37 +371,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: c.successSoft,
     marginTop: 4,
   },
   confirmedPillLabel: {
     ...typography.caption,
-    color: '#166534',
+    color: c.successText,
     fontWeight: '800',
     fontSize: 11,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: colors.overlay,
+    backgroundColor: c.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.lg,
   },
   modalCard: { width: '100%', maxWidth: 420 },
-  modalTitle: { ...typography.h3, color: colors.textPrimary, marginBottom: spacing.md },
+  modalTitle: { ...typography.h3, color: c.textPrimary, marginBottom: spacing.md },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     ...typography.body,
-    color: colors.textPrimary,
-    backgroundColor: colors.background,
+    color: c.textPrimary,
+    backgroundColor: c.background,
   },
   formatLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     fontWeight: '800',
     marginTop: spacing.md,
@@ -411,22 +413,22 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: c.border,
+    backgroundColor: c.background,
   },
   formatOptionActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+    borderColor: c.primary,
+    backgroundColor: c.primarySoft,
   },
   formatOptionTitle: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
-  formatOptionTitleActive: { color: colors.primary },
+  formatOptionTitleActive: { color: c.primary },
   formatOptionSub: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   modalActions: {

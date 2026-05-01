@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '@/theme';
+import { spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
 type Props = {
   title: string;
@@ -9,6 +10,7 @@ type Props = {
 };
 
 export function ScreenHeader({ title, subtitle, right }: Props) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.row}>
       <View style={styles.text}>
@@ -20,20 +22,21 @@ export function ScreenHeader({ title, subtitle, right }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  text: { flex: 1, paddingRight: spacing.md },
-  title: { ...typography.largeTitle, color: colors.textPrimary },
-  subtitle: {
-    ...typography.body,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-});
+const makeStyles = (c: ThemedColors) =>
+  StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.md,
+    },
+    text: { flex: 1, paddingRight: spacing.md },
+    title: { ...typography.largeTitle, color: c.textPrimary },
+    subtitle: {
+      ...typography.body,
+      color: c.textMuted,
+      marginTop: 2,
+    },
+  });

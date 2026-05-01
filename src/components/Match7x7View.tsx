@@ -20,6 +20,7 @@ import { findFormation, type FormationSlot } from '@/constants/formations';
 import { POSITION_META } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm, notify } from '@/utils/confirm';
 import type { Player, Session } from '@/types';
 
@@ -51,6 +52,7 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     getPlayerPlayMs,
     applyTeamToQuarter,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const formation = findFormation(session.formation ?? '2-3-1');
   const currentQuarter = session.currentQuarter;
@@ -424,6 +426,7 @@ function SlotPicker({
   ) => Promise<void>;
   onClose: () => void;
 }) {
+  const pickerStyles = useThemedStyles(makePickerStyles);
   const assignedId = quarterTeam[slot.id];
   const assigned = assignedId ? players.find((p) => p.id === assignedId) : undefined;
   const placedIds = new Set(Object.values(quarterTeam));
@@ -500,21 +503,21 @@ function SlotPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
   bannerCard: { marginBottom: 0 },
   bannerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   bannerEmoji: { fontSize: 28 },
-  bannerTitle: { ...typography.h3, color: colors.textPrimary },
-  bannerHint: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
+  bannerTitle: { ...typography.h3, color: c.textPrimary },
+  bannerHint: { ...typography.caption, color: c.textSecondary, marginTop: 2 },
   formationPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
   },
   formationPillLabel: {
     ...typography.micro,
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '700',
   },
   quarterTabs: {
@@ -526,64 +529,64 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: c.border,
     alignItems: 'center',
   },
   quarterTabActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primarySoft,
+    borderColor: c.primary,
+    backgroundColor: c.primarySoft,
   },
   quarterTabLive: {
-    borderColor: colors.success,
-    backgroundColor: 'rgba(52, 199, 89, 0.10)',
+    borderColor: c.success,
+    backgroundColor: c.successSoft,
   },
   quarterTabDone: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
   },
   quarterTabLabel: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
-  quarterTabLabelActive: { color: colors.primary },
-  quarterTabLabelLive: { color: colors.success },
+  quarterTabLabelActive: { color: c.primary },
+  quarterTabLabelLive: { color: c.success },
   quarterTabSub: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 2,
   },
   liveClock: {
     alignItems: 'center',
   },
   liveClockMaxed: {
-    backgroundColor: 'rgba(255, 149, 0, 0.10)',
+    backgroundColor: c.warningSoft,
     borderRadius: radius.lg,
     paddingVertical: spacing.sm,
   },
   liveClockValueMaxed: {
-    color: colors.warning,
+    color: c.warning,
   },
   liveClockLabel: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
   },
   liveClockValue: {
     ...typography.largeTitle,
     fontSize: 44,
-    color: colors.success,
+    color: c.success,
     marginTop: 4,
     fontVariant: ['tabular-nums'],
   },
   liveClockTotal: {
     fontSize: 20,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontWeight: '600',
   },
   liveClockHint: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 6,
     textAlign: 'center',
   },
@@ -592,12 +595,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: 14,
     borderRadius: radius.md,
-    backgroundColor: colors.danger,
+    backgroundColor: c.danger,
     alignSelf: 'stretch',
     alignItems: 'center',
   },
   liveEndBtnLabel: {
-    color: '#FFFFFF',
+    color: c.onPrimary,
     fontWeight: '700',
     fontSize: 15,
   },
@@ -608,36 +611,36 @@ const styles = StyleSheet.create({
   },
   formationFootnoteText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   libraryBtn: {
     marginTop: spacing.sm,
     paddingVertical: 10,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: c.accentSoft,
     alignSelf: 'center',
   },
   libraryBtnLabel: {
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '600',
     fontSize: 13,
   },
   actionsRow: { gap: spacing.sm },
   doneNote: {
     padding: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
   },
   doneNoteText: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     textAlign: 'center',
   },
   endRow: { marginTop: spacing.sm },
   sectionHeader: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: spacing.md,
   },
   timesCard: {},
@@ -649,45 +652,45 @@ const styles = StyleSheet.create({
   },
   divider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
   },
-  timeName: { flex: 1, ...typography.bodyBold, color: colors.textPrimary },
+  timeName: { flex: 1, ...typography.bodyBold, color: c.textPrimary },
   timeValue: {
     ...typography.bodyBold,
-    color: colors.primary,
+    color: c.primary,
     fontVariant: ['tabular-nums'],
   },
-  muted: { ...typography.body, color: colors.textMuted },
+  muted: { ...typography.body, color: c.textMuted },
 });
 
-const pickerStyles = StyleSheet.create({
+const makePickerStyles = (c: ThemedColors) => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     padding: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     marginBottom: spacing.md,
   },
   rowName: {
     flex: 1,
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   removeBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: 'rgba(255, 59, 48, 0.10)',
+    backgroundColor: c.dangerSoft,
   },
   removeLabel: {
-    color: colors.danger,
+    color: c.danger,
     fontWeight: '700',
   },
   group: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '800',
     textTransform: 'uppercase',
     marginTop: spacing.md,
@@ -695,7 +698,7 @@ const pickerStyles = StyleSheet.create({
   },
   muted: {
     ...typography.body,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
   grid: {
     flexDirection: 'row',
@@ -709,17 +712,17 @@ const pickerStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: radius.pill,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: c.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.border,
   },
   chipMoved: {
     borderStyle: 'dashed',
-    borderColor: colors.warning,
+    borderColor: c.warning,
   },
   chipName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 13,
   },
 });

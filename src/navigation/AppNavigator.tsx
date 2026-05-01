@@ -82,7 +82,7 @@ export function AppNavigator() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.textPrimary,
-        headerTitleStyle: { ...typography.h3 },
+        headerTitleStyle: { ...typography.h3, color: colors.textPrimary },
         headerShadowVisible: false,
       }}
     >

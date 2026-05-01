@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, typography } from '@/theme';
+import { radius, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm, notify } from '@/utils/confirm';
 import type { SyncStatus } from '@/context/DataContext';
 
@@ -11,7 +12,8 @@ type Props = {
 };
 
 export function SyncPill({ status, lastError, onRefresh }: Props) {
-  const meta = META[status];
+  const styles = useThemedStyles(makeStyles);
+  const meta = styles.meta[status];
 
   const handlePress = async () => {
     if (status === 'syncing') return;
@@ -55,22 +57,24 @@ export function SyncPill({ status, lastError, onRefresh }: Props) {
   );
 }
 
-const META: Record<SyncStatus, { label: string; color: string; bg: string }> = {
-  idle: { label: 'Cloud', color: colors.textMuted, bg: colors.accentSoft },
-  syncing: { label: 'Sync…', color: colors.primary, bg: colors.primarySoft },
-  synced: { label: 'Synchronisé', color: '#0F7A3B', bg: '#DCFCE7' },
-  offline: { label: 'Hors ligne', color: '#B45309', bg: '#FEF3C7' },
+const makeStyles = (c: ThemedColors) => {
+  const meta: Record<SyncStatus, { label: string; color: string; bg: string }> = {
+    idle: { label: 'Cloud', color: c.textMuted, bg: c.accentSoft },
+    syncing: { label: 'Sync…', color: c.primary, bg: c.primarySoft },
+    synced: { label: 'Synchronisé', color: c.successText, bg: c.successSoft },
+    offline: { label: 'Hors ligne', color: c.warningText, bg: c.warningSoft },
+  };
+  const sheet = StyleSheet.create({
+    pill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: radius.pill,
+    },
+    dot: { width: 7, height: 7, borderRadius: 4 },
+    label: { ...typography.caption, fontWeight: '700' },
+  });
+  return { ...sheet, meta };
 };
-
-const styles = StyleSheet.create({
-  pill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: radius.pill,
-  },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  label: { ...typography.caption, fontWeight: '700' },
-});

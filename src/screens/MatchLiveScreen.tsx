@@ -27,6 +27,7 @@ import {
 import { POSITION_META, POSITION_ORDER } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { formatDate } from '@/utils/date';
 import { confirm, notify } from '@/utils/confirm';
 import type { MatchEventType, Player, PlayerPosition } from '@/types';
@@ -82,6 +83,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     putOnPitch,
     takeOffPitch,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const session = sessions.find((s) => s.id === sessionId);
   const [now, setNow] = useState<number>(Date.now());
@@ -1009,6 +1011,7 @@ function SlotSheetBody({
   getPlayerMatchTotals,
   onClose,
 }: SlotSheetProps) {
+  const styles = useThemedStyles(makeStyles);
   const assignedPlayerId = lineupSlots[slot.id];
   const assignedPlayer = assignedPlayerId
     ? players.find((p) => p.id === assignedPlayerId)
@@ -1292,6 +1295,7 @@ function PlayerCard({
   onChangePosition: () => void;
   onEvent: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const hasEvents =
     totals.goals + totals.assists + totals.key + totals.yellow + totals.red > 0;
   const posMeta = position ? POSITION_META[position] : null;
@@ -1410,6 +1414,7 @@ function TotalPill({
   glyph: string;
   value: number;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.totalPill, { borderColor: color + '44' }]}>
       <Text style={styles.totalGlyph}>{glyph}</Text>
@@ -1418,10 +1423,10 @@ function TotalPill({
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  muted: { ...typography.body, color: colors.textMuted },
+  muted: { ...typography.body, color: c.textMuted },
   scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   clockCard: {},
   clockRow: {
@@ -1432,20 +1437,20 @@ const styles = StyleSheet.create({
   },
   clockLabel: {
     ...typography.micro,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
   },
   clockValue: {
     ...typography.largeTitle,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: 2,
     fontVariant: ['tabular-nums'],
   },
-  clockHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  clockHint: { ...typography.caption, color: c.textMuted, marginTop: 2 },
   clockActions: { flexDirection: 'row', gap: spacing.sm },
   sectionHeader: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: spacing.md,
   },
   formationCard: { gap: spacing.md },
@@ -1454,10 +1459,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  formationTitle: { ...typography.h3, color: colors.textPrimary },
+  formationTitle: { ...typography.h3, color: c.textPrimary },
   formationHint: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   libraryBtn: {
@@ -1465,11 +1470,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: c.accentSoft,
     alignSelf: 'center',
   },
   libraryBtnLabel: {
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '600',
     fontSize: 13,
   },
@@ -1480,10 +1485,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
   },
-  formationChipLabel: { color: colors.primary, fontWeight: '800', fontSize: 14 },
-  formationChipCaret: { color: colors.primary, fontWeight: '800' },
+  formationChipLabel: { color: c.primary, fontWeight: '800', fontSize: 14 },
+  formationChipCaret: { color: c.primary, fontWeight: '800' },
   formationGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1493,36 +1498,36 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: c.border,
     flexGrow: 1,
     alignItems: 'center',
     minWidth: 80,
   },
   formationOptionActive: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primary,
   },
   formationOptionLabel: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 16,
   },
-  formationOptionLabelActive: { color: colors.primary },
+  formationOptionLabelActive: { color: c.primary },
   customLink: {
     marginTop: spacing.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderStyle: 'dashed',
   },
   savedFormationsLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     fontWeight: '800',
     marginTop: spacing.lg,
@@ -1532,24 +1537,24 @@ const styles = StyleSheet.create({
   savedFormationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   savedFormationRowActive: {
-    backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    backgroundColor: c.primarySoft,
+    borderColor: c.primary,
   },
   savedFormationMain: { flex: 1, padding: spacing.md },
   savedFormationName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   savedFormationMeta: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   savedFormationDelete: {
@@ -1562,7 +1567,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(220, 38, 38, 0.08)',
   },
   savedFormationDeleteLabel: {
-    color: colors.danger,
+    color: c.danger,
     fontWeight: '800',
     fontSize: 22,
     lineHeight: 22,
@@ -1576,61 +1581,61 @@ const styles = StyleSheet.create({
   savedInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     ...typography.body,
-    color: colors.textPrimary,
+    color: c.textPrimary,
   },
   savedSaveBtn: {
     width: 44,
     height: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   savedSaveLabel: { fontSize: 18 },
   savedHint: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 4,
   },
   customLinkLabel: {
     ...typography.bodyBold,
-    color: colors.primary,
+    color: c.primary,
     fontSize: 15,
   },
   customLinkSub: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 4,
   },
   customWrap: { gap: spacing.md },
-  customTitle: { ...typography.h3, color: colors.textPrimary },
+  customTitle: { ...typography.h3, color: c.textPrimary },
   customSub: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
   customTotal: {
     ...typography.bodyBold,
-    color: colors.primary,
+    color: c.primary,
     fontSize: 16,
   },
   stepperRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
   },
   stepperLabel: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   stepper: {
@@ -1642,21 +1647,21 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnLabel: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 20,
     lineHeight: 22,
   },
   stepValue: {
     ...typography.h2,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     minWidth: 24,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
@@ -1673,7 +1678,7 @@ const styles = StyleSheet.create({
   },
   noFormationText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textAlign: 'center',
   },
   slotAssignedRow: {
@@ -1682,17 +1687,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     marginBottom: spacing.md,
   },
   slotAssignedName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   slotAssignedMeta: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   slotRemove: {
@@ -1701,10 +1706,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: 'rgba(255, 59, 48, 0.10)',
   },
-  slotRemoveLabel: { color: colors.danger, fontWeight: '700' },
+  slotRemoveLabel: { color: c.danger, fontWeight: '700' },
   slotGroupLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     textTransform: 'uppercase',
     fontWeight: '800',
     marginTop: spacing.md,
@@ -1722,17 +1727,17 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   slotPlayerChipMoved: {
-    borderColor: colors.warning,
+    borderColor: c.warning,
     borderStyle: 'dashed',
   },
   slotPlayerName2: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 13,
   },
   slotTotalsRow: {
@@ -1788,7 +1793,7 @@ const styles = StyleSheet.create({
   },
   benchName: {
     ...typography.caption,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontWeight: '700',
     marginTop: 4,
     fontSize: 11,
@@ -1801,13 +1806,13 @@ const styles = StyleSheet.create({
   },
   playerCard: {
     borderLeftWidth: 3,
-    borderLeftColor: colors.border,
+    borderLeftColor: c.border,
     padding: spacing.md,
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
   },
   playerCardActive: {
-    borderLeftColor: colors.success,
+    borderLeftColor: c.success,
     borderLeftWidth: 4,
     backgroundColor: 'rgba(52, 199, 89, 0.06)',
   },
@@ -1818,7 +1823,7 @@ const styles = StyleSheet.create({
   },
   playerName: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     flexShrink: 1,
   },
   positionBadge: {
@@ -1829,9 +1834,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   positionBadgeEmpty: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderStyle: 'dashed',
   },
   positionBadgeLabel: {
@@ -1841,11 +1846,11 @@ const styles = StyleSheet.create({
   },
   playerMetaMuted: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 4,
   },
   playerClock: {
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
@@ -1853,12 +1858,12 @@ const styles = StyleSheet.create({
   },
   playerClockValue: {
     ...typography.h1,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontVariant: ['tabular-nums'],
   },
   playerClockLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   playerActions: {
@@ -1872,26 +1877,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pitchToggleOn: { backgroundColor: colors.primary },
+  pitchToggleOn: { backgroundColor: c.primary },
   pitchToggleOff: {
-    backgroundColor: colors.accentSoft,
+    backgroundColor: c.accentSoft,
   },
   pitchToggleDisabled: { opacity: 0.4 },
   pitchToggleLabel: {
     ...typography.bodyBold,
     fontSize: 14,
   },
-  pitchToggleLabelLight: { color: '#FFFFFF' },
-  pitchToggleLabelDark: { color: colors.primary },
+  pitchToggleLabelLight: { color: c.onPrimary },
+  pitchToggleLabelDark: { color: c.primary },
   eventBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     borderRadius: radius.md,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  eventBtnLabel: { color: colors.primary, fontWeight: '800', fontSize: 14 },
+  eventBtnLabel: { color: c.primary, fontWeight: '800', fontSize: 14 },
   totalsRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   totalPill: {
     flexDirection: 'row',
@@ -1912,11 +1917,11 @@ const styles = StyleSheet.create({
   },
   eventDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
   },
   eventGlyph: { fontSize: 22 },
-  eventName: { ...typography.bodyBold, color: colors.textPrimary },
-  eventMeta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  eventName: { ...typography.bodyBold, color: c.textPrimary },
+  eventMeta: { ...typography.caption, color: c.textMuted, marginTop: 2 },
   eventGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1959,6 +1964,6 @@ const styles = StyleSheet.create({
   },
   positionSkipLabel: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
+    color: c.textSecondary,
   },
 });

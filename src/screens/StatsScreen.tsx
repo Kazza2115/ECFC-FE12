@@ -22,6 +22,7 @@ import { EVENT_META } from '@/constants/events';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
+import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { buildAttendanceCSV } from '@/utils/csv';
 import type { MatchEventType, PlayerMatchTotals } from '@/types';
 import { isMatchKind } from '@/types';
@@ -55,6 +56,7 @@ export function StatsScreen() {
     activeTrainingsCount,
     activeMatchesCount,
   } = useData();
+  const styles = useThemedStyles(makeStyles);
 
   const [tab, setTab] = useState<Tab>('training');
 
@@ -194,6 +196,7 @@ function TabButton({
   active: boolean;
   onPress: () => void;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <Pressable
       onPress={onPress}
@@ -219,6 +222,7 @@ function TrainingView({
   players: ReturnType<typeof useData>['players'];
   activeTrainingsCount: number;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const best = playerStats[0];
   const worst = playerStats[playerStats.length - 1];
   const totals = playerStats.reduce(
@@ -397,6 +401,7 @@ function MatchView({
   getPlayerMatchTotals: (playerId: string, sessionId?: string) => PlayerMatchTotals;
   getPlayerPlayMs: (playerId: string, sessionId?: string, now?: number) => number;
 }) {
+  const styles = useThemedStyles(makeStyles);
   const navigation = useNavigation<StatsNav>();
 
   const matchSessions = useMemo(
@@ -836,6 +841,7 @@ function MatchPill({
   count: number;
   meta: (typeof EVENT_META)[MatchEventType];
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={[styles.matchPill, { backgroundColor: meta.bg }]}>
       <Text style={styles.matchPillGlyph}>{meta.glyph}</Text>
@@ -855,6 +861,7 @@ function HighlightRow({
   label: string;
   value: string;
 }) {
+  const styles = useThemedStyles(makeStyles);
   return (
     <View style={styles.highlightRow}>
       <Text style={styles.highlightIcon}>{icon}</Text>
@@ -867,6 +874,7 @@ function HighlightRow({
 }
 
 function AggregateTile({ type, value }: { type: MatchEventType; value: number }) {
+  const styles = useThemedStyles(makeStyles);
   const meta = EVENT_META[type];
   return (
     <View style={[styles.aggregateTile, { backgroundColor: meta.bg }]}>
@@ -912,16 +920,16 @@ const miniStatStyles = StyleSheet.create({
   label: { fontSize: 10, fontWeight: '700' },
 });
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const makeStyles = (c: ThemedColors) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.background },
   content: { padding: spacing.lg, paddingTop: 0, gap: spacing.md },
   exportBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
   },
-  exportLabel: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  exportLabel: { color: c.primary, fontWeight: '700', fontSize: 13 },
   tabsRow: {
     flexDirection: 'row',
     paddingHorizontal: spacing.lg,
@@ -932,31 +940,31 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 9,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
+    borderColor: c.border,
   },
   tabActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
-  tabLabel: { ...typography.bodyBold, color: colors.textSecondary, fontSize: 13 },
-  tabLabelActive: { color: '#FFFFFF' },
+  tabLabel: { ...typography.bodyBold, color: c.textSecondary, fontSize: 13 },
+  tabLabelActive: { color: c.onPrimary },
   hero: {},
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
-  heroTitle: { ...typography.h3, color: colors.textPrimary },
-  heroHint: { ...typography.body, color: colors.textSecondary, marginTop: 4 },
+  heroTitle: { ...typography.h3, color: c.textPrimary },
+  heroHint: { ...typography.body, color: c.textSecondary, marginTop: 4 },
   heroMetaRow: { marginTop: 8 },
   heroMetaLabel: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     textTransform: 'uppercase',
   },
   heroMetaValue: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: 2,
   },
   leadersRow: {
@@ -966,14 +974,14 @@ const styles = StyleSheet.create({
   },
   leaderCard: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     padding: spacing.md,
   },
-  leaderLabel: { ...typography.caption, color: colors.textSecondary },
+  leaderLabel: { ...typography.caption, color: c.textSecondary },
   leaderValue: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: 4,
   },
   leaderCount: { ...typography.bodyBold, marginTop: 2, fontSize: 16 },
@@ -995,7 +1003,7 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row' },
   sectionTitle: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     marginTop: spacing.md,
   },
   listCard: {},
@@ -1013,12 +1021,12 @@ const styles = StyleSheet.create({
   },
   matchCardTitle: {
     ...typography.h3,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 17,
   },
   matchCardSub: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   matchCardPills: {
@@ -1040,7 +1048,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
   highlightRow: {
     flexDirection: 'row',
@@ -1054,7 +1062,7 @@ const styles = StyleSheet.create({
   },
   highlightLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     fontWeight: '700',
     textTransform: 'uppercase',
     width: 74,
@@ -1062,20 +1070,20 @@ const styles = StyleSheet.create({
   },
   highlightValue: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     flex: 1,
     fontSize: 14,
   },
   matchEmpty: {
     ...typography.body,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontStyle: 'italic',
     paddingVertical: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
   matchCta: {
-    color: colors.primary,
+    color: c.primary,
     fontWeight: '700',
     fontSize: 13,
     alignSelf: 'flex-end',
@@ -1088,7 +1096,7 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: c.border,
   },
   playerInfo: { flex: 1, minWidth: 0 },
   playerTop: {
@@ -1098,29 +1106,29 @@ const styles = StyleSheet.create({
   },
   playerName: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
     flex: 1,
     marginRight: spacing.sm,
   },
-  playerPct: { ...typography.bodyBold, color: colors.primary },
+  playerPct: { ...typography.bodyBold, color: c.primary },
   playerPctBlock: { alignItems: 'flex-end' },
   playerPctSub: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 10,
     marginTop: -2,
   },
   heroSubtitle: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     marginTop: 4,
     fontStyle: 'italic',
   },
-  heroBigTitle: { ...typography.h2, color: colors.textPrimary },
+  heroBigTitle: { ...typography.h2, color: c.textPrimary },
   heroBigSub: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: c.textSecondary,
     marginTop: 2,
   },
   heroDualRow: {
@@ -1136,17 +1144,17 @@ const styles = StyleSheet.create({
   },
   heroMetricTitle: {
     ...typography.bodyBold,
-    color: colors.textPrimary,
+    color: c.textPrimary,
     fontSize: 15,
   },
   heroMetricSub: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: c.textMuted,
     fontSize: 11,
     textAlign: 'center',
   },
   barWrap: { marginTop: 6 },
-  playerMeta: { ...typography.caption, color: colors.textMuted, marginTop: 4 },
+  playerMeta: { ...typography.caption, color: c.textMuted, marginTop: 4 },
   miniStats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   eventRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
   eventPill: {
