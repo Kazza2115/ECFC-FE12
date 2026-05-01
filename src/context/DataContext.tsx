@@ -970,9 +970,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         (st) => st.sessionId === sessionId && !st.endAt,
       );
 
-      // For 7v7 matches, every quarter is credited as 15 min minimum
-      // regardless of how early the coach taps Fin Q{n}. Real-time end
-      // is used if the quarter was actually played longer.
+      // For 7v7 matches, every quarter is capped at 15 min — even if
+      // the coach forgets to stop the chrono. Real-time only matters
+      // for the moment of action; the recorded duration always equals
+      // 15 min (quarterStart + 15 min as endAt).
       let endIso = todayISO();
       if (
         session &&
@@ -984,8 +985,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           ...openStints.map((st) => new Date(st.startAt).getTime()),
         );
         const plannedEnd = quarterStart + QUARTER_DURATION_MS;
-        const endTime = Math.max(Date.now(), plannedEnd);
-        endIso = new Date(endTime).toISOString();
+        endIso = new Date(plannedEnd).toISOString();
       }
 
       const closedStints = openStints.map((st) => ({ ...st, endAt: endIso }));
@@ -1215,8 +1215,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         (st) => st.sessionId === sessionId && !st.endAt,
       );
 
-      // 7v7: if a quarter is still active, credit it as 15 min minimum
-      // even if the coach taps Finir before the planned end.
+      // 7v7: a quarter caps at 15 min regardless of how late the
+      // coach taps Finir. The match ends visually at "now" but the
+      // open stints record exactly 15 min from the quarter start.
       let stintEndIso = endedAt;
       if (
         session &&
@@ -1227,8 +1228,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           ...openStints.map((st) => new Date(st.startAt).getTime()),
         );
         const plannedEnd = quarterStart + QUARTER_DURATION_MS;
-        const endTime = Math.max(Date.now(), plannedEnd);
-        stintEndIso = new Date(endTime).toISOString();
+        stintEndIso = new Date(plannedEnd).toISOString();
       }
 
       const nextSessions = sessions.map((s) =>
@@ -1348,13 +1348,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const getPlayerPlayMs = useCallback(
     (playerId: string, sessionId?: string, nowMs?: number): number => {
       const reference = nowMs ?? Date.now();
+      const QUARTER_DURATION_MS = 15 * 60 * 1000;
+
+      // Pre-compute quarter starts per (sessionId, quarter) for 7v7
+      // sessions involved in this query, so each open stint can be
+      // capped at quarterStart + 15 min during live playback.
+      const quarterStarts = new Map<string, number>();
+      for (const st of stints) {
+        if (!st.quarter) continue;
+        if (sessionId && st.sessionId !== sessionId) continue;
+        const session = sessions.find((s) => s.id === st.sessionId);
+        if (session?.kind !== 'match_7x7') continue;
+        const key = `${st.sessionId}|${st.quarter}`;
+        const t = new Date(st.startAt).getTime();
+        const cur = quarterStarts.get(key);
+        if (cur === undefined || t < cur) quarterStarts.set(key, t);
+      }
+
       let total = 0;
       for (const st of stints) {
         if (st.playerId !== playerId) continue;
         if (sessionId && st.sessionId !== sessionId) continue;
         if (!sessionId && !activeMatchIds.has(st.sessionId)) continue;
         const start = new Date(st.startAt).getTime();
-        const end = st.endAt ? new Date(st.endAt).getTime() : reference;
+        let end = st.endAt ? new Date(st.endAt).getTime() : reference;
+
+        // 7v7 cap: a stint never contributes past quarterStart + 15min.
+        if (st.quarter) {
+          const session = sessions.find((s) => s.id === st.sessionId);
+          if (session?.kind === 'match_7x7') {
+            const key = `${st.sessionId}|${st.quarter}`;
+            const qStart = quarterStarts.get(key);
+            if (qStart !== undefined) {
+              const cap = qStart + QUARTER_DURATION_MS;
+              if (end > cap) end = cap;
+            }
+          }
+        }
+
         if (end <= start) continue;
         let duration = end - start;
         const session = sessions.find((s) => s.id === st.sessionId);

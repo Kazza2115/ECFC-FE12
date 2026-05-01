@@ -80,7 +80,8 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     return set;
   }, [stints, sessionId, currentQuarter]);
 
-  // Quarter elapsed when active (live).
+  // Quarter elapsed when active (live), capped at 15 min so the
+  // chrono "auto-stops" if the coach forgets to tap Terminer Q{n}.
   const quarterElapsed = useMemo(() => {
     if (currentQuarter === undefined) return 0;
     const stintsThisQuarter = stints.filter(
@@ -93,8 +94,11 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     const earliest = Math.min(
       ...stintsThisQuarter.map((st) => new Date(st.startAt).getTime()),
     );
-    return now - earliest;
+    return Math.min(now - earliest, QUARTER_DURATION_MS);
   }, [stints, sessionId, currentQuarter, now]);
+
+  const quarterMaxed =
+    currentQuarter !== undefined && quarterElapsed >= QUARTER_DURATION_MS;
 
   const handleSlotPress = (slot: FormationSlot) => {
     if (currentQuarter !== undefined && currentQuarter === selectedQuarter) {
@@ -222,19 +226,27 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
       </View>
 
       {currentQuarter !== undefined && !ended ? (
-        <Card style={styles.liveClock}>
-          <Text style={styles.liveClockLabel}>Q{currentQuarter} en cours</Text>
-          <Text style={styles.liveClockValue}>
-            {fmt(quarterElapsed)} <Text style={styles.liveClockTotal}>/ 15:00</Text>
+        <Card style={[styles.liveClock, quarterMaxed && styles.liveClockMaxed]}>
+          <Text style={styles.liveClockLabel}>
+            {quarterMaxed
+              ? `Q${currentQuarter} terminé · pense à tapoter Terminer`
+              : `Q${currentQuarter} en cours`}
+          </Text>
+          <Text
+            style={[
+              styles.liveClockValue,
+              quarterMaxed && styles.liveClockValueMaxed,
+            ]}
+          >
+            {fmt(quarterElapsed)}{' '}
+            <Text style={styles.liveClockTotal}>/ 15:00</Text>
           </Text>
           <Text style={styles.liveClockHint}>
-            Tu peux terminer le quart-temps à tout moment, pas besoin
-            d'attendre 15 min.
+            {quarterMaxed
+              ? 'Le chrono est arrêté à 15:00. Le temps de jeu n\'évolue plus.'
+              : 'Tu peux terminer le quart-temps à tout moment, pas besoin d\'attendre 15 min.'}
           </Text>
-          <Pressable
-            onPress={handleEndQuarter}
-            style={styles.liveEndBtn}
-          >
+          <Pressable onPress={handleEndQuarter} style={styles.liveEndBtn}>
             <Text style={styles.liveEndBtnLabel}>
               ⏹ Terminer Q{currentQuarter} maintenant
             </Text>
@@ -522,6 +534,14 @@ const styles = StyleSheet.create({
   },
   liveClock: {
     alignItems: 'center',
+  },
+  liveClockMaxed: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  liveClockValueMaxed: {
+    color: '#B45309',
   },
   liveClockLabel: {
     ...typography.caption,
