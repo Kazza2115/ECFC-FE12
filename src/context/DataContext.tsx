@@ -1392,7 +1392,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const start = new Date(st.startAt).getTime();
         let end = st.endAt ? new Date(st.endAt).getTime() : reference;
 
-        // 7v7 cap: a stint never contributes past quarterStart + 15min.
+        // 7v7: every quarter counts as 15 min total, no matter when the
+        // chrono is actually stopped.
+        // - Closed stints (subs done mid-quarter) keep their actual end.
+        // - Still-open stints (player currently on the pitch) are
+        //   credited up to quarterStart + 15min so the cumulative
+        //   display shows the anticipated full credit instead of the
+        //   real-time elapsed.
         if (st.quarter) {
           const session = sessions.find((s) => s.id === st.sessionId);
           if (session?.kind === 'match_7x7') {
@@ -1400,7 +1406,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             const qStart = quarterStarts.get(key);
             if (qStart !== undefined) {
               const cap = qStart + QUARTER_DURATION_MS;
-              if (end > cap) end = cap;
+              if (!st.endAt) {
+                // Open stint → anticipate 15-min credit even at 1 sec real.
+                end = cap;
+              } else if (end > cap) {
+                end = cap;
+              }
             }
           }
         }
