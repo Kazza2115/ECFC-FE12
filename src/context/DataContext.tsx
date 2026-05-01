@@ -964,11 +964,31 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const endQuarter = useCallback(
     async (sessionId: string) => {
-      const endAt = todayISO();
+      const session = sessions.find((s) => s.id === sessionId);
+      const QUARTER_DURATION_MS = 15 * 60 * 1000;
       const openStints = stints.filter(
         (st) => st.sessionId === sessionId && !st.endAt,
       );
-      const closedStints = openStints.map((st) => ({ ...st, endAt }));
+
+      // For 7v7 matches, every quarter is credited as 15 min minimum
+      // regardless of how early the coach taps Fin Q{n}. Real-time end
+      // is used if the quarter was actually played longer.
+      let endIso = todayISO();
+      if (
+        session &&
+        isMatchKind(session.kind) &&
+        session.kind === 'match_7x7' &&
+        openStints.length > 0
+      ) {
+        const quarterStart = Math.min(
+          ...openStints.map((st) => new Date(st.startAt).getTime()),
+        );
+        const plannedEnd = quarterStart + QUARTER_DURATION_MS;
+        const endTime = Math.max(Date.now(), plannedEnd);
+        endIso = new Date(endTime).toISOString();
+      }
+
+      const closedStints = openStints.map((st) => ({ ...st, endAt: endIso }));
       const closedMap = new Map(closedStints.map((s) => [s.id, s]));
       const nextStints = stints.map((st) => closedMap.get(st.id) ?? st);
 
@@ -1188,17 +1208,41 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const endMatch = useCallback(
     async (sessionId: string) => {
+      const session = sessions.find((s) => s.id === sessionId);
       const endedAt = todayISO();
+      const QUARTER_DURATION_MS = 15 * 60 * 1000;
+      const openStints = stints.filter(
+        (st) => st.sessionId === sessionId && !st.endAt,
+      );
+
+      // 7v7: if a quarter is still active, credit it as 15 min minimum
+      // even if the coach taps Finir before the planned end.
+      let stintEndIso = endedAt;
+      if (
+        session &&
+        session.kind === 'match_7x7' &&
+        openStints.length > 0
+      ) {
+        const quarterStart = Math.min(
+          ...openStints.map((st) => new Date(st.startAt).getTime()),
+        );
+        const plannedEnd = quarterStart + QUARTER_DURATION_MS;
+        const endTime = Math.max(Date.now(), plannedEnd);
+        stintEndIso = new Date(endTime).toISOString();
+      }
+
       const nextSessions = sessions.map((s) =>
-        s.id === sessionId ? { ...s, endedAt } : s,
+        s.id === sessionId
+          ? { ...s, endedAt: stintEndIso, currentQuarter: undefined }
+          : s,
       );
       setSessions(nextSessions);
       await db.saveSessions(nextSessions);
 
-      const openStints = stints.filter(
-        (st) => st.sessionId === sessionId && !st.endAt,
-      );
-      const closedStints = openStints.map((st) => ({ ...st, endAt: endedAt }));
+      const closedStints = openStints.map((st) => ({
+        ...st,
+        endAt: stintEndIso,
+      }));
       const stintMap = new Map(closedStints.map((s) => [s.id, s]));
       const nextStints = stints.map((st) => stintMap.get(st.id) ?? st);
       setStints(nextStints);
