@@ -526,19 +526,47 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const setSessionConfirmed = useCallback(
     async (sessionId: string, value: boolean) => {
-      const next = sessions.map((s) =>
+      const session = sessions.find((s) => s.id === sessionId);
+      const nextSessions = sessions.map((s) =>
         s.id === sessionId ? { ...s, confirmed: value } : s,
       );
-      setSessions(next);
-      await db.saveSessions(next);
-      const changed = next.find((s) => s.id === sessionId);
-      if (changed) {
-        await pushSafe('setSessionConfirmed', () =>
-          remote.upsertSession(changed),
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changedSession = nextSessions.find((s) => s.id === sessionId);
+
+      // Auto-fill missing attendances as 'Présent' on confirmation of a
+      // training so the coach doesn't have to tap "Tout présent" first.
+      // We only touch players who have no explicit record yet — anyone
+      // marked Excusé / Absent / SFC / RC / etc. keeps their status.
+      let newAttendances: Attendance[] = [];
+      if (value && session && !isMatchKind(session.kind)) {
+        const existingPlayerIds = new Set(
+          attendances
+            .filter((a) => a.sessionId === sessionId)
+            .map((a) => a.playerId),
         );
+        newAttendances = players
+          .filter((p) => !existingPlayerIds.has(p.id))
+          .map((p) => ({
+            sessionId,
+            playerId: p.id,
+            status: 'present' as AttendanceStatus,
+          }));
+        if (newAttendances.length > 0) {
+          const nextAttendances = [...attendances, ...newAttendances];
+          setAttendances(nextAttendances);
+          await db.saveAttendances(nextAttendances);
+        }
       }
+
+      await pushSafe('setSessionConfirmed', async () => {
+        if (changedSession) await remote.upsertSession(changedSession);
+        if (newAttendances.length > 0) {
+          await remote.upsertAttendances(newAttendances);
+        }
+      });
     },
-    [sessions],
+    [sessions, attendances, players],
   );
 
   const setAttendance = useCallback(async (sessionId: string, playerId: string, status: AttendanceStatus) => {
