@@ -214,6 +214,7 @@ export function SessionScreen({ route, navigation }: Props) {
               );
             } catch {}
             await setSessionConfirmed(sessionId, true);
+            navigation.popToTop();
           }}
           style={styles.confirmBanner}
         >

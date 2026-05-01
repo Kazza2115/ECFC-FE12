@@ -115,13 +115,44 @@ export function MatchSheetScreen({ route, navigation }: Props) {
     return totals;
   }, [events]);
 
-  const matchDurationMs =
-    session?.startedAt && session?.endedAt
-      ? new Date(session.endedAt).getTime() -
+  const QUARTER_DURATION_MS = 15 * 60 * 1000;
+
+  const quarterStarts = useMemo(() => {
+    const map = new Map<number, number>();
+    if (session?.kind !== 'match_7x7') return map;
+    for (const st of stints) {
+      if (st.sessionId !== sessionId || !st.quarter) continue;
+      const t = new Date(st.startAt).getTime();
+      const cur = map.get(st.quarter);
+      if (cur === undefined || t < cur) map.set(st.quarter, t);
+    }
+    return map;
+  }, [stints, session?.kind, sessionId]);
+
+  // For 7v7, the match duration is the sum of completed quarter
+  // durations (15 min each), not the wall-clock between started_at
+  // and ended_at. A quarter is "played" if at least one stint exists
+  // with that quarter number.
+  const matchDurationMs = (() => {
+    if (session?.kind === 'match_7x7') {
+      const quartersPlayed = new Set<number>();
+      for (const st of stints) {
+        if (st.sessionId !== sessionId || !st.quarter) continue;
+        quartersPlayed.add(st.quarter);
+      }
+      return quartersPlayed.size * QUARTER_DURATION_MS;
+    }
+    if (session?.startedAt && session?.endedAt) {
+      return (
+        new Date(session.endedAt).getTime() -
         new Date(session.startedAt).getTime()
-      : session?.startedAt
-      ? Date.now() - new Date(session.startedAt).getTime()
-      : 0;
+      );
+    }
+    if (session?.startedAt) {
+      return Date.now() - new Date(session.startedAt).getTime();
+    }
+    return 0;
+  })();
 
   if (!session) {
     return (
@@ -316,6 +347,10 @@ export function MatchSheetScreen({ route, navigation }: Props) {
                     players={players}
                     last={index === arr.length - 1}
                     nowMs={nowMs}
+                    is7x7={session.kind === 'match_7x7'}
+                    quarterStarts={
+                      session.kind === 'match_7x7' ? quarterStarts : undefined
+                    }
                   />
                 ))}
             </Card>
@@ -431,15 +466,27 @@ function StintRow({
   players,
   last,
   nowMs,
+  is7x7,
+  quarterStarts,
 }: {
   stint: PlayerStint;
   players: ReturnType<typeof useData>['players'];
   last: boolean;
   nowMs: number;
+  is7x7?: boolean;
+  quarterStarts?: Map<number, number>;
 }) {
   const player = players.find((p) => p.id === stint.playerId);
   const start = new Date(stint.startAt).getTime();
-  const end = stint.endAt ? new Date(stint.endAt).getTime() : nowMs;
+  let end = stint.endAt ? new Date(stint.endAt).getTime() : nowMs;
+  if (is7x7 && stint.quarter && quarterStarts) {
+    const qStart = quarterStarts.get(stint.quarter);
+    if (qStart !== undefined) {
+      const cap = qStart + 15 * 60 * 1000;
+      if (!stint.endAt) end = cap;
+      else if (end > cap) end = cap;
+    }
+  }
   const ms = Math.max(0, end - start);
   const posMeta = stint.position ? POSITION_META[stint.position] : null;
   return (

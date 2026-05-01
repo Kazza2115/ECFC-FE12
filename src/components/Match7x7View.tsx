@@ -7,6 +7,9 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/navigation/AppNavigator';
 import { Avatar } from '@/components/Avatar';
 import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
@@ -36,6 +39,8 @@ type Props = {
 };
 
 export function Match7x7View({ session, sessionId, convoqués }: Props) {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const {
     players,
     stints,
@@ -160,6 +165,7 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     });
     if (!ok) return;
     await endMatch(sessionId);
+    navigation.popToTop();
   };
 
   // Decide what action to show.

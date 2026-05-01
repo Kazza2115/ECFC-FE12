@@ -250,6 +250,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
       );
     } catch {}
     await endMatch(sessionId);
+    navigation.popToTop();
   };
 
   const handleAddEvent = async (player: Player, type: MatchEventType) => {
