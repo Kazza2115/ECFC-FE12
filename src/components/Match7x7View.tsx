@@ -12,6 +12,7 @@ import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { FormationPitch } from '@/components/FormationPitch';
+import { TeamLibrarySheet } from '@/components/TeamLibrarySheet';
 import { findFormation, type FormationSlot } from '@/constants/formations';
 import { POSITION_META } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
@@ -43,6 +44,7 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     endQuarter,
     endMatch,
     getPlayerPlayMs,
+    applyTeamToQuarter,
   } = useData();
 
   const formation = findFormation(session.formation ?? '2-3-1');
@@ -53,6 +55,7 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     currentQuarter ?? 1,
   );
   const [slotSheet, setSlotSheet] = useState<FormationSlot | null>(null);
+  const [teamSheetOpen, setTeamSheetOpen] = useState<boolean>(false);
   const [now, setNow] = useState<number>(Date.now());
 
   useEffect(() => {
@@ -266,19 +269,21 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
               (currentQuarter !== undefined && currentQuarter === selectedQuarter)
             }
           />
-          <Pressable
-            onPress={() =>
-              notify(
-                'Changer de formation',
-                'Pour cette version 7v7, la formation 2-3-1 est utilisée par défaut. Tu pourras la personnaliser depuis le picker formation existant en allant sur la séance.',
-              )
-            }
-            style={styles.formationFootnote}
-          >
+          <View style={styles.formationFootnote}>
             <Text style={styles.formationFootnoteText}>
               Formation : {formation.label} · même pour les 4 quart-temps
             </Text>
-          </Pressable>
+          </View>
+          {currentQuarter !== selectedQuarter && !ended ? (
+            <Pressable
+              onPress={() => setTeamSheetOpen(true)}
+              style={styles.libraryBtn}
+            >
+              <Text style={styles.libraryBtnLabel}>
+                📋 Mes équipes enregistrées
+              </Text>
+            </Pressable>
+          ) : null}
         </Card>
       ) : null}
 
@@ -373,6 +378,18 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
           />
         ) : null}
       </BottomSheet>
+
+      <TeamLibrarySheet
+        visible={teamSheetOpen}
+        onClose={() => setTeamSheetOpen(false)}
+        title={`Équipes · Q${selectedQuarter}`}
+        currentSlots={quarterTeams[String(selectedQuarter)] ?? {}}
+        currentFormation={session.formation}
+        formationFilter={session.formation}
+        onApply={(team) =>
+          applyTeamToQuarter(sessionId, selectedQuarter, team)
+        }
+      />
     </>
   );
 }
@@ -589,6 +606,19 @@ const styles = StyleSheet.create({
   formationFootnoteText: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  libraryBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignSelf: 'center',
+  },
+  libraryBtnLabel: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 13,
   },
   actionsRow: { gap: spacing.sm },
   doneNote: {

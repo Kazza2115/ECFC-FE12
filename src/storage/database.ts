@@ -5,6 +5,7 @@ import type {
   Player,
   PlayerStint,
   SavedFormation,
+  SavedTeam,
   Session,
 } from '@/types';
 
@@ -15,6 +16,7 @@ const KEYS = {
   matchEvents: 'ecfc:matchEvents',
   stints: 'ecfc:stints',
   savedFormations: 'ecfc:savedFormations',
+  savedTeams: 'ecfc:savedTeams',
   seeded: 'ecfc:seeded',
 };
 
@@ -69,6 +71,12 @@ export const db = {
   async saveSavedFormations(items: SavedFormation[]): Promise<void> {
     await writeJSON(KEYS.savedFormations, items);
   },
+  async getSavedTeams(): Promise<SavedTeam[]> {
+    return readJSON<SavedTeam[]>(KEYS.savedTeams, []);
+  },
+  async saveSavedTeams(items: SavedTeam[]): Promise<void> {
+    await writeJSON(KEYS.savedTeams, items);
+  },
   async wasSeeded(): Promise<boolean> {
     const v = await kv.getItem(KEYS.seeded);
     return v === '1';
@@ -84,6 +92,7 @@ export const db = {
       KEYS.matchEvents,
       KEYS.stints,
       KEYS.savedFormations,
+      KEYS.savedTeams,
       KEYS.seeded,
     ]);
   },

@@ -109,3 +109,11 @@ export type SavedFormation = {
   counts: number[];
   createdAt: string;
 };
+
+export type SavedTeam = {
+  id: string;
+  name: string;
+  formation?: string;
+  slots: Record<string, string>;
+  createdAt: string;
+};

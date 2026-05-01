@@ -16,6 +16,7 @@ import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { FormationPitch } from '@/components/FormationPitch';
 import { Match7x7View } from '@/components/Match7x7View';
+import { TeamLibrarySheet } from '@/components/TeamLibrarySheet';
 import { EVENT_META, EVENT_ORDER } from '@/constants/events';
 import {
   DEFAULT_FORMATION_ID,
@@ -66,6 +67,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     getSessionStints,
     getPlayerPlayMs,
     setLineupPosition,
+    applyTeamToSession,
     removeFromLineup,
     setFormation,
     assignToSlot,
@@ -87,6 +89,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   const [positionSheet, setPositionSheet] = useState<PositionSheetState>(null);
   const [slotSheet, setSlotSheet] = useState<SlotSheetState>(null);
   const [formationSheet, setFormationSheet] = useState<FormationSheetOpen>(false);
+  const [teamLibraryOpen, setTeamLibraryOpen] = useState<boolean>(false);
   const [customMode, setCustomMode] = useState<boolean>(false);
   const [customCounts, setCustomCounts] = useState<number[]>([4, 3, 3]);
   const [saveName, setSaveName] = useState<string>('');
@@ -450,13 +453,25 @@ export function MatchLiveScreen({ route, navigation }: Props) {
               </View>
 
               {formation ? (
-                <FormationPitch
-                  formation={formation}
-                  lineupSlots={lineupSlots}
-                  players={players}
-                  onSlotPress={(slot) => setSlotSheet({ slot })}
-                  readOnly={ended}
-                />
+                <>
+                  <FormationPitch
+                    formation={formation}
+                    lineupSlots={lineupSlots}
+                    players={players}
+                    onSlotPress={(slot) => setSlotSheet({ slot })}
+                    readOnly={ended}
+                  />
+                  {!started && !ended ? (
+                    <Pressable
+                      onPress={() => setTeamLibraryOpen(true)}
+                      style={styles.libraryBtn}
+                    >
+                      <Text style={styles.libraryBtnLabel}>
+                        📋 Mes équipes enregistrées
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </>
               ) : (
                 <View style={styles.noFormation}>
                   <Text style={styles.noFormationText}>
@@ -946,6 +961,16 @@ export function MatchLiveScreen({ route, navigation }: Props) {
           />
         ) : null}
       </BottomSheet>
+
+      <TeamLibrarySheet
+        visible={teamLibraryOpen}
+        onClose={() => setTeamLibraryOpen(false)}
+        title="Mes équipes"
+        currentSlots={lineupSlots}
+        currentFormation={session.formation}
+        formationFilter={session.formation}
+        onApply={(team) => applyTeamToSession(sessionId, team)}
+      />
     </SafeAreaView>
   );
 }
@@ -1433,6 +1458,19 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  libraryBtn: {
+    marginTop: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primarySoft,
+    alignSelf: 'center',
+  },
+  libraryBtnLabel: {
+    color: colors.primary,
+    fontWeight: '800',
+    fontSize: 13,
   },
   formationChip: {
     flexDirection: 'row',

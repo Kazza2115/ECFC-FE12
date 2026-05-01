@@ -7,6 +7,7 @@ import type {
   PlayerPosition,
   PlayerStint,
   SavedFormation,
+  SavedTeam,
   Session,
 } from '@/types';
 
@@ -73,6 +74,15 @@ type DbSavedFormation = {
   id: string;
   name: string;
   counts: number[];
+  team_id: string;
+  created_at: string;
+};
+
+type DbSavedTeam = {
+  id: string;
+  name: string;
+  formation: string | null;
+  slots: Record<string, string>;
   team_id: string;
   created_at: string;
 };
@@ -233,6 +243,27 @@ function fromDbSavedFormation(row: DbSavedFormation): SavedFormation {
   };
 }
 
+function toDbSavedTeam(t: SavedTeam): DbSavedTeam {
+  return {
+    id: t.id,
+    name: t.name,
+    formation: t.formation ?? null,
+    slots: t.slots,
+    team_id: TEAM_ID,
+    created_at: t.createdAt,
+  };
+}
+
+function fromDbSavedTeam(row: DbSavedTeam): SavedTeam {
+  return {
+    id: row.id,
+    name: row.name,
+    formation: row.formation ?? undefined,
+    slots: (row.slots as Record<string, string>) ?? {},
+    createdAt: row.created_at,
+  };
+}
+
 export type RemoteSnapshot = {
   players: Player[];
   sessions: Session[];
@@ -240,17 +271,19 @@ export type RemoteSnapshot = {
   matchEvents: MatchEvent[];
   stints: PlayerStint[];
   savedFormations: SavedFormation[];
+  savedTeams: SavedTeam[];
 };
 
 export const remote = {
   async fetchAll(): Promise<RemoteSnapshot> {
-    const [pRes, sRes, aRes, eRes, stRes, sfRes] = await Promise.all([
+    const [pRes, sRes, aRes, eRes, stRes, sfRes, stmRes] = await Promise.all([
       supabase.from('ecfc_players').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_sessions').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_attendances').select('*'),
       supabase.from('ecfc_match_events').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_player_stints').select('*').eq('team_id', TEAM_ID),
       supabase.from('ecfc_saved_formations').select('*').eq('team_id', TEAM_ID),
+      supabase.from('ecfc_saved_teams').select('*').eq('team_id', TEAM_ID),
     ]);
     if (pRes.error) throw pRes.error;
     if (sRes.error) throw sRes.error;
@@ -258,6 +291,7 @@ export const remote = {
     if (eRes.error && eRes.error.code !== 'PGRST205') throw eRes.error;
     if (stRes.error && stRes.error.code !== 'PGRST205') throw stRes.error;
     if (sfRes.error && sfRes.error.code !== 'PGRST205') throw sfRes.error;
+    if (stmRes.error && stmRes.error.code !== 'PGRST205') throw stmRes.error;
     return {
       players: (pRes.data ?? []).map(fromDbPlayer),
       sessions: (sRes.data ?? []).map(fromDbSession),
@@ -265,6 +299,7 @@ export const remote = {
       matchEvents: (eRes.data ?? []).map(fromDbMatchEvent),
       stints: (stRes.data ?? []).map(fromDbStint),
       savedFormations: (sfRes.data ?? []).map(fromDbSavedFormation),
+      savedTeams: (stmRes.data ?? []).map(fromDbSavedTeam),
     };
   },
   async upsertPlayer(p: Player): Promise<void> {
@@ -390,6 +425,19 @@ export const remote = {
   async deleteSavedFormation(id: string): Promise<void> {
     const { error } = await supabase
       .from('ecfc_saved_formations')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  },
+  async upsertSavedTeam(t: SavedTeam): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_saved_teams')
+      .upsert(toDbSavedTeam(t));
+    if (error) throw error;
+  },
+  async deleteSavedTeam(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_saved_teams')
       .delete()
       .eq('id', id);
     if (error) throw error;

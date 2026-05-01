@@ -22,6 +22,7 @@ import type {
   PlayerStats,
   PlayerStint,
   SavedFormation,
+  SavedTeam,
   Session,
   SessionKind,
 } from '@/types';
@@ -72,6 +73,11 @@ type DataContextValue = {
   savedFormations: SavedFormation[];
   saveFormation: (name: string, counts: number[]) => Promise<SavedFormation>;
   deleteSavedFormation: (id: string) => Promise<void>;
+  savedTeams: SavedTeam[];
+  saveTeam: (name: string, slots: Record<string, string>, formation?: string) => Promise<SavedTeam>;
+  deleteSavedTeam: (id: string) => Promise<void>;
+  applyTeamToSession: (sessionId: string, team: SavedTeam) => Promise<void>;
+  applyTeamToQuarter: (sessionId: string, quarter: number, team: SavedTeam) => Promise<void>;
   startMatch: (sessionId: string) => Promise<void>;
   pauseMatch: (sessionId: string) => Promise<void>;
   resumeMatch: (sessionId: string) => Promise<void>;
@@ -113,6 +119,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [matchEvents, setMatchEvents] = useState<MatchEvent[]>([]);
   const [stints, setStints] = useState<PlayerStint[]>([]);
   const [savedFormations, setSavedFormations] = useState<SavedFormation[]>([]);
+  const [savedTeams, setSavedTeams] = useState<SavedTeam[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
@@ -144,6 +151,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         cachedEvents,
         cachedStints,
         cachedSavedFormations,
+        cachedSavedTeams,
         seeded,
       ] = await Promise.all([
         db.getPlayers(),
@@ -152,6 +160,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         db.getMatchEvents(),
         db.getStints(),
         db.getSavedFormations(),
+        db.getSavedTeams(),
         db.wasSeeded(),
       ]);
 
@@ -161,6 +170,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setMatchEvents(cachedEvents);
       setStints(cachedStints);
       setSavedFormations(cachedSavedFormations);
+      setSavedTeams(cachedSavedTeams);
       setLoading(false);
 
       setSyncStatus('syncing');
@@ -178,6 +188,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           setMatchEvents(snap.matchEvents);
           setStints(snap.stints);
           setSavedFormations(snap.savedFormations);
+          setSavedTeams(snap.savedTeams);
           await Promise.all([
             db.savePlayers(snap.players),
             db.saveSessions(snap.sessions),
@@ -185,6 +196,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             db.saveMatchEvents(snap.matchEvents),
             db.saveStints(snap.stints),
             db.saveSavedFormations(snap.savedFormations),
+            db.saveSavedTeams(snap.savedTeams),
             db.markSeeded(),
           ]);
         } else if (cachedPlayers.length === 0 && !seeded) {
@@ -237,6 +249,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setMatchEvents(snap.matchEvents);
       setStints(snap.stints);
       setSavedFormations(snap.savedFormations);
+      setSavedTeams(snap.savedTeams);
       await Promise.all([
         db.savePlayers(snap.players),
         db.saveSessions(snap.sessions),
@@ -244,6 +257,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         db.saveMatchEvents(snap.matchEvents),
         db.saveStints(snap.stints),
         db.saveSavedFormations(snap.savedFormations),
+        db.saveSavedTeams(snap.savedTeams),
       ]);
       markSynced();
     } catch (err) {
@@ -300,6 +314,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'ecfc_saved_formations' },
+        schedule,
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ecfc_saved_teams' },
         schedule,
       )
       .subscribe();
@@ -1532,6 +1551,103 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     [savedFormations],
   );
 
+  const saveTeam = useCallback(
+    async (
+      name: string,
+      slots: Record<string, string>,
+      formation?: string,
+    ) => {
+      const trimmed = name.trim();
+      const item: SavedTeam = {
+        id: uid(),
+        name: trimmed.length > 0 ? trimmed : 'Équipe sans nom',
+        formation,
+        slots,
+        createdAt: todayISO(),
+      };
+      const next = [...savedTeams, item];
+      setSavedTeams(next);
+      await db.saveSavedTeams(next);
+      await pushSafe('saveTeam', () => remote.upsertSavedTeam(item));
+      return item;
+    },
+    [savedTeams],
+  );
+
+  const deleteSavedTeam = useCallback(
+    async (id: string) => {
+      const next = savedTeams.filter((t) => t.id !== id);
+      setSavedTeams(next);
+      await db.saveSavedTeams(next);
+      await pushSafe('deleteSavedTeam', () =>
+        remote.deleteSavedTeam(id),
+      );
+    },
+    [savedTeams],
+  );
+
+  const applyTeamToSession = useCallback(
+    async (sessionId: string, team: SavedTeam) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const formation = team.formation
+        ? findFormation(team.formation)
+        : findFormation(session.formation);
+      const targetFormation = team.formation ?? session.formation;
+      const nextLineup = Array.from(new Set(Object.values(team.slots)));
+      const nextPositions: Record<string, PlayerPosition> = {};
+      if (formation) {
+        for (const [slotId, playerId] of Object.entries(team.slots)) {
+          const slot = formation.slots.find((s) => s.id === slotId);
+          if (slot) nextPositions[playerId] = slot.position;
+        }
+      }
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId
+          ? {
+              ...s,
+              formation: targetFormation ?? s.formation,
+              lineupSlots: { ...team.slots },
+              startingLineup: nextLineup,
+              lineupPositions: nextPositions,
+            }
+          : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('applyTeamToSession', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
+
+  const applyTeamToQuarter = useCallback(
+    async (sessionId: string, quarter: number, team: SavedTeam) => {
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) return;
+      const allTeams: Record<string, Record<string, string>> = {
+        ...(session.quarterTeams ?? {}),
+      };
+      allTeams[String(quarter)] = { ...team.slots };
+      const nextSessions = sessions.map((s) =>
+        s.id === sessionId ? { ...s, quarterTeams: allTeams } : s,
+      );
+      setSessions(nextSessions);
+      await db.saveSessions(nextSessions);
+      const changed = nextSessions.find((s) => s.id === sessionId);
+      if (changed) {
+        await pushSafe('applyTeamToQuarter', () =>
+          remote.upsertSession(changed),
+        );
+      }
+    },
+    [sessions],
+  );
+
   const resetAll = useCallback(async () => {
     await db.resetAll();
     setPlayers([]);
@@ -1540,6 +1656,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setMatchEvents([]);
     setStints([]);
     setSavedFormations([]);
+    setSavedTeams([]);
   }, []);
 
   const value: DataContextValue = {
@@ -1577,6 +1694,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     savedFormations,
     saveFormation,
     deleteSavedFormation,
+    savedTeams,
+    saveTeam,
+    deleteSavedTeam,
+    applyTeamToSession,
+    applyTeamToQuarter,
     startMatch,
     pauseMatch,
     resumeMatch,
