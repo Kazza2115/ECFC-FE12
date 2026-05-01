@@ -264,7 +264,7 @@ function TrainingView({
               label="actif"
             />
             <Text style={styles.heroMetricTitle}>Actifs</Text>
-            <Text style={styles.heroMetricSub}>+ SFC + Retour SFC</Text>
+            <Text style={styles.heroMetricSub}>+ SFC + Retour au club</Text>
           </View>
         </View>
 

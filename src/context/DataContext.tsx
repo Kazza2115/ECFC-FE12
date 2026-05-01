@@ -1402,7 +1402,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .sort((a, b) => b.called - a.called);
   }, [players, activeMatches, activeMatchIds, attendances]);
 
-  // "Actif" = Présent au club + SFC + Retour de SFC
+  // "Actif" = Présent au club + SFC + Retour au club
   const globalRatio = useMemo(() => {
     if (activeTrainings.length === 0 || players.length === 0) return 0;
     const possible = activeTrainings.length * players.length;

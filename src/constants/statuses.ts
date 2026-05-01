@@ -55,8 +55,8 @@ export const STATUS_META: Record<AttendanceStatus, StatusMeta> = {
   },
   return: {
     key: 'return',
-    short: 'RSF',
-    label: 'Retour de SFC · pas au club',
+    short: 'RC',
+    label: 'Retour au club',
     glyph: '↺',
     color: '#B45309',
     bg: '#FEF3C7',
