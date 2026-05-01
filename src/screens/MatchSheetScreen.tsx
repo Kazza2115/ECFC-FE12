@@ -517,11 +517,11 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xxl },
   header: {},
   date: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    ...typography.micro,
+    color: colors.textMuted,
     textTransform: 'uppercase',
   },
-  title: { ...typography.h1, color: colors.textPrimary, marginTop: 4 },
+  title: { ...typography.largeTitle, color: colors.textPrimary, marginTop: 4 },
   headerMetaRow: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 90,
   },
-  metaLabel: { ...typography.caption, color: colors.textSecondary },
+  metaLabel: { ...typography.micro, color: colors.textMuted, textTransform: 'uppercase' },
   metaValue: {
     ...typography.bodyBold,
     color: colors.textPrimary,
@@ -596,16 +596,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
   },
   starterLabel: {
+    ...typography.micro,
     color: colors.primary,
-    fontWeight: '800',
-    fontSize: 11,
+    fontWeight: '700',
   },
   positionPill: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  positionLabel: { fontWeight: '800', fontSize: 11 },
+  positionLabel: { ...typography.micro, fontWeight: '700' },
   eventMiniRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   miniEvent: {
     flexDirection: 'row',
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  stintPosLabel: { fontWeight: '800', fontSize: 11 },
+  stintPosLabel: { ...typography.micro, fontWeight: '700' },
   stintDuration: {
     ...typography.bodyBold,
     color: colors.textPrimary,

@@ -1431,15 +1431,15 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   clockLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    ...typography.micro,
+    color: colors.textMuted,
     textTransform: 'uppercase',
   },
   clockValue: {
-    ...typography.number,
-    fontSize: 32,
+    ...typography.largeTitle,
     color: colors.textPrimary,
     marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
   clockHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   clockActions: { flexDirection: 'row', gap: spacing.sm },
@@ -1463,14 +1463,14 @@ const styles = StyleSheet.create({
   libraryBtn: {
     marginTop: spacing.sm,
     paddingVertical: 10,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     borderRadius: radius.pill,
-    backgroundColor: colors.primarySoft,
+    backgroundColor: colors.accentSoft,
     alignSelf: 'center',
   },
   libraryBtnLabel: {
     color: colors.primary,
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13,
   },
   formationChip: {
@@ -1494,7 +1494,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     borderRadius: radius.md,
     backgroundColor: colors.background,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     flexGrow: 1,
     alignItems: 'center',
@@ -1699,7 +1699,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(255, 59, 48, 0.10)',
   },
   slotRemoveLabel: { color: colors.danger, fontWeight: '700' },
   slotGroupLabel: {
@@ -1771,7 +1771,7 @@ const styles = StyleSheet.create({
   slotRemoveFull: {
     paddingVertical: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: 'rgba(255, 59, 48, 0.10)',
     alignItems: 'center',
   },
   benchCard: {
@@ -1800,7 +1800,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   playerCard: {
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: colors.border,
     padding: spacing.md,
     gap: spacing.md,
@@ -1808,8 +1808,8 @@ const styles = StyleSheet.create({
   },
   playerCardActive: {
     borderLeftColor: colors.success,
-    borderLeftWidth: 6,
-    backgroundColor: '#F0FDF4',
+    borderLeftWidth: 4,
+    backgroundColor: 'rgba(52, 199, 89, 0.06)',
   },
   playerTop: {
     flexDirection: 'row',
@@ -1817,9 +1817,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   playerName: {
-    ...typography.bodyBold,
+    ...typography.h3,
     color: colors.textPrimary,
-    fontSize: 18,
     flexShrink: 1,
   },
   positionBadge: {
@@ -1853,8 +1852,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   playerClockValue: {
-    ...typography.number,
-    fontSize: 30,
+    ...typography.h1,
     color: colors.textPrimary,
     fontVariant: ['tabular-nums'],
   },
@@ -1876,9 +1874,7 @@ const styles = StyleSheet.create({
   },
   pitchToggleOn: { backgroundColor: colors.primary },
   pitchToggleOff: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.accentSoft,
   },
   pitchToggleDisabled: { opacity: 0.4 },
   pitchToggleLabel: {
@@ -1886,7 +1882,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   pitchToggleLabelLight: { color: '#FFFFFF' },
-  pitchToggleLabelDark: { color: colors.textPrimary },
+  pitchToggleLabelDark: { color: colors.primary },
   eventBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 12,

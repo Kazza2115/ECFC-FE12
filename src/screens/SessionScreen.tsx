@@ -168,7 +168,7 @@ export function SessionScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <View style={styles.topBar}>
-        <View style={styles.summaryRow}>
+        <View style={styles.topRow}>
           <View style={styles.kindBadge}>
             <Text style={styles.kindBadgeText}>
               {isMatch ? '⚽ Match' : '🏋️ Entraînement'}
@@ -179,18 +179,18 @@ export function SessionScreen({ route, navigation }: Props) {
               vs {session.label}
             </Text>
           ) : null}
-        </View>
-
-        <View style={styles.summaryBlock}>
-          <Text style={styles.summaryValue}>
-            {presentCount}
-            <Text style={styles.summaryDivider}>/{players.length}</Text>
-          </Text>
-          <Text style={styles.summaryLabel}>{summaryLabel}</Text>
+          <View style={{ flex: 1 }} />
+          <View style={styles.summaryBlock}>
+            <Text style={styles.summaryValue}>
+              {presentCount}
+              <Text style={styles.summaryDivider}>/{players.length}</Text>
+            </Text>
+            <Text style={styles.summaryLabel}>{summaryLabel}</Text>
+          </View>
         </View>
 
         <View style={styles.cancelBlock}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.cancelTitle}>
               {isMatch ? 'Match annulé' : 'Entraînement annulé'}
             </Text>
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.sm,
   },
-  summaryRow: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -454,16 +454,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.primarySoft,
   },
-  kindBadgeText: { color: colors.primary, fontWeight: '700', fontSize: 12 },
-  opponent: { ...typography.body, color: colors.textPrimary, flexShrink: 1 },
+  kindBadgeText: { ...typography.micro, color: colors.primary, fontWeight: '700' },
+  opponent: { ...typography.bodyBold, color: colors.textPrimary, flexShrink: 1 },
   summaryBlock: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: spacing.sm,
+    alignItems: 'flex-end',
   },
-  summaryValue: { ...typography.number, fontSize: 30, color: colors.textPrimary },
-  summaryDivider: { color: colors.textMuted, fontSize: 18, fontWeight: '600' },
-  summaryLabel: { ...typography.body, color: colors.textSecondary },
+  summaryValue: { ...typography.h1, color: colors.textPrimary },
+  summaryDivider: { color: colors.textMuted, fontSize: 16, fontWeight: '600' },
+  summaryLabel: { ...typography.caption, color: colors.textMuted, marginTop: -2 },
   cancelBlock: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -482,30 +480,27 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255, 149, 0, 0.10)',
   },
   confirmBannerTitle: {
     ...typography.bodyBold,
-    color: '#92400E',
-    fontSize: 14,
+    color: '#B45309',
   },
   confirmBannerHint: {
     ...typography.caption,
-    color: '#92400E',
+    color: '#B45309',
     marginTop: 2,
   },
   confirmBannerCta: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
     borderRadius: radius.pill,
-    backgroundColor: '#F59E0B',
+    backgroundColor: colors.warning,
   },
   confirmBannerCtaLabel: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '700',
     fontSize: 13,
   },
   confirmedBanner: {
@@ -515,26 +510,23 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
     padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: '#DCFCE7',
-    borderWidth: 1,
-    borderColor: '#16A34A',
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(52, 199, 89, 0.10)',
   },
   confirmedGlyph: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '800',
-    color: '#15803D',
-    width: 26,
+    color: '#0F7A3B',
+    width: 24,
     textAlign: 'center',
   },
   confirmedTitle: {
     ...typography.bodyBold,
-    color: '#14532D',
-    fontSize: 14,
+    color: '#0F7A3B',
   },
   confirmedHint: {
     ...typography.caption,
-    color: '#166534',
+    color: '#0F7A3B',
     marginTop: 2,
   },
   confirmedUndo: {
@@ -542,12 +534,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#16A34A',
   },
   confirmedUndoLabel: {
-    color: '#15803D',
-    fontWeight: '700',
+    color: '#0F7A3B',
+    fontWeight: '600',
     fontSize: 13,
   },
   bulkRow: {
@@ -558,22 +548,22 @@ const styles = StyleSheet.create({
   },
   bulkChip: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: radius.pill,
     backgroundColor: colors.primary,
     alignItems: 'center',
   },
-  bulkChipGhost: { backgroundColor: colors.primarySoft },
-  bulkLabel: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  bulkChipGhost: { backgroundColor: colors.accentSoft },
+  bulkLabel: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
   bulkLabelGhost: { color: colors.primary },
   list: { padding: spacing.lg, paddingBottom: spacing.xxl },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.sm,
-    paddingRight: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
     gap: spacing.sm,
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
   },
   rowDisabled: { opacity: 0.4 },
   rowText: { flex: 1, minWidth: 0 },
