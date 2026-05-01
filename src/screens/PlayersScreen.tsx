@@ -19,8 +19,17 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm } from '@/utils/confirm';
 import { pickPlayerPhoto } from '@/utils/photo';
+import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList, TabParamList } from '@/navigation/AppNavigator';
 
-export function PlayersScreen() {
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Players'>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
+
+export function PlayersScreen({ navigation }: { navigation: Nav }) {
   const {
     players,
     addPlayer,
@@ -126,36 +135,44 @@ export function PlayersScreen() {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           renderItem={({ item }) => (
-            <Card padded={false} style={styles.row}>
-              <Pressable
-                onPress={() => handlePhoto(item.id, !!item.photoUri)}
-                style={styles.avatarWrap}
-              >
-                <Avatar name={item.name} photoUri={item.photoUri} size={48} />
-                <View style={styles.cameraBadge}>
-                  <Text style={styles.cameraGlyph}>
-                    {busyId === item.id ? '…' : '📷'}
-                  </Text>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('PlayerDetail', { playerId: item.id })
+              }
+              style={({ pressed }) => [pressed && styles.rowPressed]}
+            >
+              <Card padded={false} style={styles.row}>
+                <Pressable
+                  onPress={() => handlePhoto(item.id, !!item.photoUri)}
+                  style={styles.avatarWrap}
+                >
+                  <Avatar name={item.name} photoUri={item.photoUri} size={48} />
+                  <View style={styles.cameraBadge}>
+                    <Text style={styles.cameraGlyph}>
+                      {busyId === item.id ? '…' : '📷'}
+                    </Text>
+                  </View>
+                </Pressable>
+                <View style={styles.rowText}>
+                  <Text style={styles.rowName}>{item.name}</Text>
+                  <Text style={styles.rowHint}>Voir les statistiques ›</Text>
                 </View>
-              </Pressable>
-              <Pressable
-                style={styles.rowText}
-                onPress={() => openEdit(item.id, item.name)}
-              >
-                <Text style={styles.rowName}>{item.name}</Text>
-                <Text style={styles.rowHint}>
-                  {item.photoUri
-                    ? 'Photo ajoutée · appuyer pour renommer'
-                    : 'Appuyer pour renommer'}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={styles.deleteBtn}
-                onPress={() => confirmDelete(item.id, item.name)}
-              >
-                <Text style={styles.deleteBtnLabel}>Suppr.</Text>
-              </Pressable>
-            </Card>
+                <Pressable
+                  style={styles.iconBtn}
+                  onPress={() => openEdit(item.id, item.name)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.iconGlyph}>✎</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.deleteBtn}
+                  onPress={() => confirmDelete(item.id, item.name)}
+                  hitSlop={8}
+                >
+                  <Text style={styles.deleteBtnLabel}>Suppr.</Text>
+                </Pressable>
+              </Card>
+            </Pressable>
           )}
         />
       )}
@@ -247,7 +264,21 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     color: c.textPrimary,
     fontSize: 16,
   },
-  rowHint: { ...typography.caption, color: c.textMuted, marginTop: 2 },
+  rowHint: { ...typography.caption, color: c.primary, marginTop: 2, fontWeight: '600' },
+  rowPressed: { opacity: 0.85 },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: c.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconGlyph: {
+    color: c.primary,
+    fontWeight: '700',
+    fontSize: 16,
+  },
   deleteBtn: {
     paddingHorizontal: spacing.md,
     paddingVertical: 8,
