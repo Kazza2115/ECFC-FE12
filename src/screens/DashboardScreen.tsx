@@ -57,7 +57,8 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
   const greeting = coachFirstName
     ? `Bonjour ${coachFirstName}`
     : 'Bonjour Coach';
-  const teamLabel = profile?.teamName ?? 'Étoile Carouge FC';
+  const teamLabel = profile?.teamName ?? 'Mon équipe';
+  const isCarouge = profile?.teamId === 'ecfc-juniors';
 
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
@@ -116,9 +117,12 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.subtitle}>{teamLabel}</Text>
-            <Text style={styles.greeting}>{greeting}</Text>
+          <View style={styles.headerLeft}>
+            {isCarouge ? <ClubLogo size={36} /> : null}
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.subtitle}>{teamLabel}</Text>
+              <Text style={styles.greeting}>{greeting}</Text>
+            </View>
           </View>
           <View style={styles.headerRight}>
             <SyncPill
@@ -347,6 +351,13 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.lg,
     gap: spacing.md,
+  },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minWidth: 0,
   },
   greeting: { ...typography.largeTitle, color: c.textPrimary, marginTop: 2 },
   subtitle: {

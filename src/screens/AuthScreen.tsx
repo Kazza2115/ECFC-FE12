@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppLogo } from '@/components/AppLogo';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ClubLogo } from '@/components/ClubLogo';
 import { useAuth } from '@/context/AuthContext';
 import { radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
@@ -81,7 +81,7 @@ export function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.brand}>
-            <ClubLogo size={64} />
+            <AppLogo size={72} />
             <Text style={styles.title}>Coach Hub</Text>
             <Text style={styles.subtitle}>
               Présences, stats et matchs synchronisés avec ton équipe.

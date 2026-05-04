@@ -560,16 +560,32 @@ export const auth = {
     name: string,
     userId: string,
   ): Promise<{ teamId: string; teamName: string }> {
-    const teamId = teamIdFromString(name);
+    const trimmed = name.trim();
+    const teamId = teamIdFromString(trimmed);
     const { error } = await supabase
       .from('ecfc_teams')
       .insert({
         id: teamId,
-        name: name.trim(),
+        name: trimmed,
         created_by: userId,
       });
-    if (error) throw error;
-    return { teamId, teamName: name.trim() };
+    if (error) {
+      // 23505 = unique_violation (PostgreSQL). The unique index is
+      // built on lower(name), so a duplicate name (case-insensitive)
+      // surfaces here.
+      const code = (error as any)?.code;
+      const msg = (error as any)?.message ?? '';
+      if (
+        code === '23505' ||
+        /duplicate key|unique constraint|already exists/i.test(msg)
+      ) {
+        throw new Error(
+          `Une équipe nommée « ${trimmed} » existe déjà. Choisis un autre nom.`,
+        );
+      }
+      throw error;
+    }
+    return { teamId, teamName: trimmed };
   },
 
   async createProfile(

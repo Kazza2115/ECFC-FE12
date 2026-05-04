@@ -11,9 +11,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppLogo } from '@/components/AppLogo';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ClubLogo } from '@/components/ClubLogo';
 import { useAuth } from '@/context/AuthContext';
 import { radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
@@ -89,7 +89,7 @@ export function OnboardingScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.brand}>
-            <ClubLogo size={56} />
+            <AppLogo size={64} />
             <Text style={styles.title}>Bienvenue !</Text>
             <Text style={styles.subtitle}>
               {session?.user?.email
