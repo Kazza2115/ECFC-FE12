@@ -116,18 +116,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <TeamLogo
-              teamId={profile?.teamId}
-              logoUrl={profile?.teamLogoUrl}
-              size={36}
-            />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.subtitle}>{teamLabel}</Text>
-              <Text style={styles.greeting}>{greeting}</Text>
-            </View>
-          </View>
-          <View style={styles.headerRight}>
+          <View style={styles.headerControls}>
             <SyncPill
               status={syncStatus}
               lastError={lastSyncError}
@@ -135,6 +124,17 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             />
             <ThemeToggle />
             <ProfileMenu />
+          </View>
+          <View style={styles.headerHero}>
+            <TeamLogo
+              teamId={profile?.teamId}
+              logoUrl={profile?.teamLogoUrl}
+              size={52}
+            />
+            <View style={styles.headerHeroText}>
+              <Text style={styles.subtitle}>{teamLabel}</Text>
+              <Text style={styles.greeting}>{greeting}</Text>
+            </View>
           </View>
         </View>
 
@@ -347,20 +347,27 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.background },
   content: { paddingBottom: spacing.xxl },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.lg,
     gap: spacing.md,
   },
-  headerLeft: {
-    flex: 1,
+  headerControls: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     gap: spacing.sm,
-    minWidth: 0,
+  },
+  headerHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingTop: spacing.xs,
+  },
+  headerHeroText: {
+    alignItems: 'flex-start',
+    flexShrink: 1,
   },
   greeting: { ...typography.largeTitle, color: c.textPrimary, marginTop: 2 },
   subtitle: {
