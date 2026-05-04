@@ -15,7 +15,7 @@ import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ClubLogo } from '@/components/ClubLogo';
+import { TeamLogo } from '@/components/TeamLogo';
 import { SyncPill } from '@/components/SyncPill';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { ProfileMenu } from '@/components/ProfileMenu';
@@ -58,7 +58,6 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     ? `Bonjour ${coachFirstName}`
     : 'Bonjour Coach';
   const teamLabel = profile?.teamName ?? 'Mon équipe';
-  const isCarouge = profile?.teamId === 'ecfc-juniors';
 
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
@@ -118,7 +117,11 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
       >
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {isCarouge ? <ClubLogo size={36} /> : null}
+            <TeamLogo
+              teamId={profile?.teamId}
+              logoUrl={profile?.teamLogoUrl}
+              size={36}
+            />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.subtitle}>{teamLabel}</Text>
               <Text style={styles.greeting}>{greeting}</Text>

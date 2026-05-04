@@ -473,19 +473,21 @@ export type CoachProfile = {
   displayName: string;
   teamId: string;
   teamName: string;
+  teamLogoUrl?: string | null;
   photoUrl?: string | null;
-  role?: string | null;
-  phone?: string | null;
-  bio?: string | null;
 };
 
 export type CoachProfilePatch = Partial<{
   displayName: string;
-  role: string | null;
-  phone: string | null;
-  bio: string | null;
   photoUrl: string | null;
 }>;
+
+export type CoachNote = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 function teamIdFromString(name: string): string {
   // Slug + short random suffix so two coaches can use the same team
@@ -534,7 +536,7 @@ export const auth = {
   async fetchProfile(userId: string): Promise<CoachProfile | null> {
     const { data: profileRow, error: profErr } = await supabase
       .from('ecfc_coach_profiles')
-      .select('user_id, display_name, team_id, photo_url, role, phone, bio')
+      .select('user_id, display_name, team_id, photo_url')
       .eq('user_id', userId)
       .maybeSingle();
     if (profErr) throw profErr;
@@ -542,7 +544,7 @@ export const auth = {
 
     const { data: teamRow, error: teamErr } = await supabase
       .from('ecfc_teams')
-      .select('id, name')
+      .select('id, name, logo_url')
       .eq('id', profileRow.team_id)
       .maybeSingle();
     if (teamErr) throw teamErr;
@@ -552,10 +554,8 @@ export const auth = {
       displayName: profileRow.display_name,
       teamId: profileRow.team_id,
       teamName: teamRow?.name ?? 'Mon équipe',
+      teamLogoUrl: teamRow?.logo_url ?? null,
       photoUrl: profileRow.photo_url ?? null,
-      role: profileRow.role ?? null,
-      phone: profileRow.phone ?? null,
-      bio: profileRow.bio ?? null,
     };
   },
 
@@ -632,9 +632,6 @@ export const auth = {
       if (!v) throw new Error('Le nom est requis.');
       update.display_name = v;
     }
-    if (patch.role !== undefined) update.role = patch.role?.trim() || null;
-    if (patch.phone !== undefined) update.phone = patch.phone?.trim() || null;
-    if (patch.bio !== undefined) update.bio = patch.bio?.trim() || null;
     if (patch.photoUrl !== undefined) update.photo_url = patch.photoUrl;
     if (Object.keys(update).length === 0) return;
     update.updated_at = now();
@@ -644,6 +641,89 @@ export const auth = {
       .update(update)
       .eq('user_id', userId);
     if (error) throw error;
+  },
+
+  async fetchNotes(userId: string): Promise<CoachNote[]> {
+    const { data, error } = await supabase
+      .from('ecfc_coach_notes')
+      .select('id, content, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      content: row.content,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  },
+
+  async createNote(userId: string, content: string): Promise<CoachNote> {
+    const trimmed = content.trim();
+    if (!trimmed) throw new Error('Une note ne peut pas être vide.');
+    const { data, error } = await supabase
+      .from('ecfc_coach_notes')
+      .insert({ user_id: userId, content: trimmed })
+      .select('id, content, created_at, updated_at')
+      .single();
+    if (error) throw error;
+    return {
+      id: data.id,
+      content: data.content,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+    };
+  },
+
+  async updateNote(noteId: string, content: string): Promise<void> {
+    const trimmed = content.trim();
+    if (!trimmed) throw new Error('Une note ne peut pas être vide.');
+    const { error } = await supabase
+      .from('ecfc_coach_notes')
+      .update({ content: trimmed, updated_at: now() })
+      .eq('id', noteId);
+    if (error) throw error;
+  },
+
+  async deleteNote(noteId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_coach_notes')
+      .delete()
+      .eq('id', noteId);
+    if (error) throw error;
+  },
+
+  async updateTeamLogoUrl(teamId: string, logoUrl: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_teams')
+      .update({ logo_url: logoUrl, updated_at: now() })
+      .eq('id', teamId);
+    if (error) throw error;
+  },
+
+  async uploadTeamLogo(
+    teamId: string,
+    dataUriOrLocalUri: string,
+  ): Promise<string> {
+    const response = await fetch(dataUriOrLocalUri);
+    const blob = await response.blob();
+    const path = `${teamId}/team-logo.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, blob, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '3600',
+      });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+    return `${data.publicUrl}?v=${Date.now()}`;
+  },
+
+  async deleteTeamLogo(teamId: string): Promise<void> {
+    await supabase.storage
+      .from(PHOTO_BUCKET)
+      .remove([`${teamId}/team-logo.jpg`]);
   },
 
   async uploadCoachPhoto(

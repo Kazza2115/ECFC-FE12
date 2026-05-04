@@ -27,6 +27,8 @@ type AuthContextValue = {
   updateProfile: (patch: CoachProfilePatch) => Promise<void>;
   // Replace / clear the coach's profile photo. Pass undefined to remove.
   setCoachPhoto: (uri: string | undefined) => Promise<void>;
+  // Replace / clear the coach team's crest. Pass undefined to remove.
+  setTeamLogo: (uri: string | undefined) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -40,6 +42,7 @@ const AuthContext = createContext<AuthContextValue>({
   createTeam: async () => {},
   updateProfile: async () => {},
   setCoachPhoto: async () => {},
+  setTeamLogo: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -183,6 +186,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [session, refreshProfile],
   );
 
+  const setTeamLogo = useCallback(
+    async (uri: string | undefined) => {
+      const userId = session?.user?.id;
+      const teamId = profile?.teamId;
+      if (!userId || !teamId) return;
+      if (!uri) {
+        try {
+          await auth.deleteTeamLogo(teamId);
+        } catch {}
+        await auth.updateTeamLogoUrl(teamId, null);
+      } else {
+        const url = await auth.uploadTeamLogo(teamId, uri);
+        await auth.updateTeamLogoUrl(teamId, url);
+      }
+      await refreshProfile(userId);
+    },
+    [session, profile, refreshProfile],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       loading,
@@ -195,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       createTeam,
       updateProfile,
       setCoachPhoto,
+      setTeamLogo,
     }),
     [
       loading,
@@ -207,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       createTeam,
       updateProfile,
       setCoachPhoto,
+      setTeamLogo,
     ],
   );
 

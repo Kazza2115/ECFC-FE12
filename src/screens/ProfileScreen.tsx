@@ -14,10 +14,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
-import { ClubLogo } from '@/components/ClubLogo';
+import { TeamLogo } from '@/components/TeamLogo';
 import { useAuth } from '@/context/AuthContext';
+import { auth, type CoachNote } from '@/storage/remote';
 import { confirm } from '@/utils/confirm';
 import { pickPlayerPhoto } from '@/utils/photo';
+import { formatDate } from '@/utils/date';
 import { radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -26,63 +28,90 @@ import type { RootStackParamList } from '@/navigation/AppNavigator';
 type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 
 export function ProfileScreen({ navigation }: Props) {
-  const { profile, session, updateProfile, setCoachPhoto, signOut } = useAuth();
+  const {
+    profile,
+    session,
+    updateProfile,
+    setCoachPhoto,
+    setTeamLogo,
+    signOut,
+  } = useAuth();
   const styles = useThemedStyles(makeStyles);
 
+  // Identity edit state
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
-  const [role, setRole] = useState(profile?.role ?? '');
-  const [phone, setPhone] = useState(profile?.phone ?? '');
-  const [bio, setBio] = useState(profile?.bio ?? '');
+  const [editingName, setEditingName] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [info, setInfo] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
 
-  // Re-hydrate the form whenever the profile changes (e.g. after a
-  // save round-trip).
-  useEffect(() => {
-    setDisplayName(profile?.displayName ?? '');
-    setRole(profile?.role ?? '');
-    setPhone(profile?.phone ?? '');
-    setBio(profile?.bio ?? '');
-  }, [profile]);
+  // Team-logo edit state
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [teamError, setTeamError] = useState<string | null>(null);
+
+  // Notes state
+  const [notes, setNotes] = useState<CoachNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  // The id of the note currently being edited, or 'new' for an unsaved
+  // brand new note.
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string>('');
+  const [noteBusy, setNoteBusy] = useState<string | null>(null);
+
+  const userId = session?.user?.id;
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: 'Mon profil' });
   }, [navigation]);
 
-  const dirty =
-    (displayName.trim() !== (profile?.displayName ?? '')) ||
-    (role.trim() !== (profile?.role ?? '')) ||
-    (phone.trim() !== (profile?.phone ?? '')) ||
-    (bio.trim() !== (profile?.bio ?? ''));
+  useEffect(() => {
+    setDisplayName(profile?.displayName ?? '');
+  }, [profile?.displayName]);
 
-  const handleSave = async () => {
-    setError(null);
-    setInfo(null);
-    if (!displayName.trim()) {
-      setError('Ton nom est requis.');
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await auth.fetchNotes(userId);
+        if (!cancelled) setNotes(list);
+      } catch (err: any) {
+        if (!cancelled)
+          setNotesError(err?.message ?? 'Impossible de charger les notes.');
+      } finally {
+        if (!cancelled) setNotesLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const saveName = async () => {
+    setIdentityError(null);
+    const v = displayName.trim();
+    if (!v) {
+      setIdentityError('Ton nom est requis.');
       return;
     }
-    setSaving(true);
+    if (v === profile?.displayName) {
+      setEditingName(false);
+      return;
+    }
+    setSavingName(true);
     try {
-      await updateProfile({
-        displayName,
-        role: role || null,
-        phone: phone || null,
-        bio: bio || null,
-      });
-      setInfo('Profil mis à jour.');
+      await updateProfile({ displayName: v });
+      setEditingName(false);
     } catch (err: any) {
-      setError(err?.message ?? 'Impossible de sauvegarder.');
+      setIdentityError(err?.message ?? 'Impossible de sauvegarder.');
     } finally {
-      setSaving(false);
+      setSavingName(false);
     }
   };
 
   const handlePhoto = async () => {
-    setError(null);
-    setInfo(null);
+    setIdentityError(null);
     if (profile?.photoUrl) {
       const replace = await confirm({
         title: 'Photo de profil',
@@ -100,7 +129,7 @@ export function ProfileScreen({ navigation }: Props) {
           try {
             await setCoachPhoto(undefined);
           } catch (err: any) {
-            setError(err?.message ?? 'Suppression échouée.');
+            setIdentityError(err?.message ?? 'Suppression échouée.');
           } finally {
             setPhotoBusy(false);
           }
@@ -108,15 +137,52 @@ export function ProfileScreen({ navigation }: Props) {
         return;
       }
     }
-
     setPhotoBusy(true);
     try {
       const uri = await pickPlayerPhoto();
       if (uri) await setCoachPhoto(uri);
     } catch (err: any) {
-      setError(err?.message ?? 'Téléversement échoué.');
+      setIdentityError(err?.message ?? 'Téléversement échoué.');
     } finally {
       setPhotoBusy(false);
+    }
+  };
+
+  const handleTeamLogo = async () => {
+    setTeamError(null);
+    if (profile?.teamLogoUrl) {
+      const replace = await confirm({
+        title: 'Blason de l\'équipe',
+        message: 'Remplacer ou supprimer le blason actuel ?',
+        confirmLabel: 'Remplacer',
+      });
+      if (!replace) {
+        const del = await confirm({
+          title: 'Supprimer le blason ?',
+          confirmLabel: 'Supprimer',
+          destructive: true,
+        });
+        if (del) {
+          setLogoBusy(true);
+          try {
+            await setTeamLogo(undefined);
+          } catch (err: any) {
+            setTeamError(err?.message ?? 'Suppression échouée.');
+          } finally {
+            setLogoBusy(false);
+          }
+        }
+        return;
+      }
+    }
+    setLogoBusy(true);
+    try {
+      const uri = await pickPlayerPhoto();
+      if (uri) await setTeamLogo(uri);
+    } catch (err: any) {
+      setTeamError(err?.message ?? 'Téléversement échoué.');
+    } finally {
+      setLogoBusy(false);
     }
   };
 
@@ -131,8 +197,86 @@ export function ProfileScreen({ navigation }: Props) {
     await signOut();
   };
 
-  const isCarouge = profile?.teamId === 'ecfc-juniors';
-  const initials = (profile?.displayName ?? '?').slice(0, 1).toUpperCase();
+  // ----- Notes ------------------------------------------------------
+
+  const startNewNote = () => {
+    setNotesError(null);
+    setDraft('');
+    setEditingNoteId('new');
+  };
+
+  const startEditNote = (n: CoachNote) => {
+    setNotesError(null);
+    setDraft(n.content);
+    setEditingNoteId(n.id);
+  };
+
+  const cancelEdit = () => {
+    setEditingNoteId(null);
+    setDraft('');
+  };
+
+  const saveNote = async () => {
+    if (!userId) return;
+    const v = draft.trim();
+    if (!v) {
+      setNotesError('Une note ne peut pas être vide.');
+      return;
+    }
+    setNoteBusy(editingNoteId);
+    setNotesError(null);
+    try {
+      if (editingNoteId === 'new') {
+        const created = await auth.createNote(userId, v);
+        setNotes((prev) => [created, ...prev]);
+      } else if (editingNoteId) {
+        await auth.updateNote(editingNoteId, v);
+        const nowIso = new Date().toISOString();
+        setNotes((prev) =>
+          prev
+            .map((n) =>
+              n.id === editingNoteId
+                ? { ...n, content: v, updatedAt: nowIso }
+                : n,
+            )
+            .sort(
+              (a, b) =>
+                new Date(b.updatedAt).getTime() -
+                new Date(a.updatedAt).getTime(),
+            ),
+        );
+      }
+      cancelEdit();
+    } catch (err: any) {
+      setNotesError(err?.message ?? 'Sauvegarde échouée.');
+    } finally {
+      setNoteBusy(null);
+    }
+  };
+
+  const deleteNote = async (n: CoachNote) => {
+    const ok = await confirm({
+      title: 'Supprimer cette note ?',
+      message: 'Cette action est définitive.',
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
+    if (!ok) return;
+    setNoteBusy(n.id);
+    setNotesError(null);
+    try {
+      await auth.deleteNote(n.id);
+      setNotes((prev) => prev.filter((x) => x.id !== n.id));
+      if (editingNoteId === n.id) cancelEdit();
+    } catch (err: any) {
+      setNotesError(err?.message ?? 'Suppression échouée.');
+    } finally {
+      setNoteBusy(null);
+    }
+  };
+
+  const hasTeamLogo =
+    !!profile?.teamLogoUrl || profile?.teamId === 'ecfc-juniors';
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -144,13 +288,14 @@ export function ProfileScreen({ navigation }: Props) {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Identity ------------------------------------------------- */}
           <Card style={styles.identityCard}>
             <Pressable
               onPress={photoBusy ? undefined : handlePhoto}
               style={styles.avatarWrap}
             >
               <Avatar
-                name={profile?.displayName ?? initials}
+                name={profile?.displayName ?? '?'}
                 photoUri={profile?.photoUrl ?? undefined}
                 size={104}
               />
@@ -162,81 +307,226 @@ export function ProfileScreen({ navigation }: Props) {
                 )}
               </View>
             </Pressable>
-            <Text style={styles.name}>{profile?.displayName ?? '—'}</Text>
-            {profile?.role ? (
-              <Text style={styles.roleHint}>{profile.role}</Text>
-            ) : null}
-            <Text style={styles.email}>{session?.user?.email ?? ''}</Text>
-          </Card>
 
-          <Card style={styles.teamCard}>
-            <View style={styles.teamRow}>
-              {isCarouge ? <ClubLogo size={40} /> : null}
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.teamLabel}>Équipe</Text>
-                <Text style={styles.teamName} numberOfLines={1}>
-                  {profile?.teamName ?? '—'}
-                </Text>
+            {editingName ? (
+              <View style={styles.nameEditRow}>
+                <TextInput
+                  style={styles.nameInput}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  placeholder="Prénom Nom"
+                  placeholderTextColor="#8E8E93"
+                  autoFocus
+                  onSubmitEditing={saveName}
+                  returnKeyType="done"
+                />
+                <Pressable
+                  onPress={saveName}
+                  style={styles.iconBtn}
+                  disabled={savingName}
+                  hitSlop={8}
+                >
+                  {savingName ? (
+                    <ActivityIndicator size="small" />
+                  ) : (
+                    <Text style={styles.iconBtnLabel}>✓</Text>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setEditingName(false);
+                    setDisplayName(profile?.displayName ?? '');
+                    setIdentityError(null);
+                  }}
+                  style={styles.iconBtnGhost}
+                  hitSlop={8}
+                >
+                  <Text style={styles.iconBtnGhostLabel}>×</Text>
+                </Pressable>
               </View>
-            </View>
+            ) : (
+              <Pressable
+                onPress={() => setEditingName(true)}
+                style={styles.nameRow}
+                hitSlop={4}
+              >
+                <Text style={styles.name}>{profile?.displayName ?? '—'}</Text>
+                <Text style={styles.nameEditHint}>✎</Text>
+              </Pressable>
+            )}
+
+            <Text style={styles.email}>{session?.user?.email ?? ''}</Text>
+
+            {identityError ? (
+              <Text style={styles.error}>{identityError}</Text>
+            ) : null}
           </Card>
 
+          {/* Mes équipes -------------------------------------------- */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Informations</Text>
+            <Text style={styles.sectionTitle}>Mes équipes</Text>
+            <Card style={styles.teamCard}>
+              <View style={styles.teamRow}>
+                <Pressable
+                  onPress={logoBusy ? undefined : handleTeamLogo}
+                  style={styles.teamLogoWrap}
+                >
+                  {hasTeamLogo ? (
+                    <TeamLogo
+                      teamId={profile?.teamId}
+                      logoUrl={profile?.teamLogoUrl}
+                      size={56}
+                    />
+                  ) : (
+                    <View style={styles.teamLogoPlaceholder}>
+                      <Text style={styles.teamLogoPlaceholderGlyph}>＋</Text>
+                    </View>
+                  )}
+                  <View style={styles.teamLogoBadge}>
+                    {logoBusy ? (
+                      <ActivityIndicator size="small" />
+                    ) : (
+                      <Text style={styles.cameraGlyph}>📷</Text>
+                    )}
+                  </View>
+                </Pressable>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.teamName} numberOfLines={1}>
+                    {profile?.teamName ?? '—'}
+                  </Text>
+                  <Text style={styles.teamHint}>
+                    {hasTeamLogo
+                      ? 'Tape sur le blason pour le changer'
+                      : 'Tape pour ajouter un blason'}
+                  </Text>
+                </View>
+              </View>
+              {teamError ? (
+                <Text style={styles.error}>{teamError}</Text>
+              ) : null}
+            </Card>
+          </View>
 
-            <Text style={styles.label}>Nom affiché</Text>
-            <TextInput
-              style={styles.input}
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Prénom Nom"
-              placeholderTextColor="#8E8E93"
-              editable={!saving}
-            />
+          {/* Coin notes --------------------------------------------- */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Coin notes</Text>
+              {editingNoteId !== 'new' ? (
+                <Pressable
+                  onPress={startNewNote}
+                  style={styles.addBtn}
+                  hitSlop={6}
+                >
+                  <Text style={styles.addBtnLabel}>＋</Text>
+                </Pressable>
+              ) : null}
+            </View>
 
-            <Text style={styles.label}>Fonction (optionnel)</Text>
-            <TextInput
-              style={styles.input}
-              value={role}
-              onChangeText={setRole}
-              placeholder="Coach principal · U13"
-              placeholderTextColor="#8E8E93"
-              editable={!saving}
-            />
+            {notesError ? (
+              <Text style={styles.error}>{notesError}</Text>
+            ) : null}
 
-            <Text style={styles.label}>Téléphone (optionnel)</Text>
-            <TextInput
-              style={styles.input}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="+41 79 000 00 00"
-              placeholderTextColor="#8E8E93"
-              keyboardType="phone-pad"
-              editable={!saving}
-            />
+            {/* New-note draft */}
+            {editingNoteId === 'new' ? (
+              <Card style={styles.noteCard}>
+                <TextInput
+                  style={[styles.noteInput, styles.noteInputMultiline]}
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder="Ta note…"
+                  placeholderTextColor="#8E8E93"
+                  multiline
+                  textAlignVertical="top"
+                  autoFocus
+                />
+                <View style={styles.noteActions}>
+                  <Button
+                    label="Annuler"
+                    variant="secondary"
+                    onPress={cancelEdit}
+                  />
+                  <View style={{ width: spacing.sm }} />
+                  <Button label="Enregistrer" onPress={saveNote} />
+                </View>
+              </Card>
+            ) : null}
 
-            <Text style={styles.label}>À propos (optionnel)</Text>
-            <TextInput
-              style={[styles.input, styles.inputMultiline]}
-              value={bio}
-              onChangeText={setBio}
-              placeholder="Quelques mots sur ton parcours, ta philosophie de jeu…"
-              placeholderTextColor="#8E8E93"
-              multiline
-              textAlignVertical="top"
-              editable={!saving}
-            />
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            {info ? <Text style={styles.info}>{info}</Text> : null}
-
-            <View style={{ height: spacing.md }} />
-            <Button
-              label="Sauvegarder"
-              onPress={handleSave}
-              fullWidth
-              disabled={saving || !dirty}
-            />
+            {notesLoading ? (
+              <View style={styles.notesLoading}>
+                <ActivityIndicator />
+              </View>
+            ) : notes.length === 0 && editingNoteId !== 'new' ? (
+              <Card style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Aucune note</Text>
+                <Text style={styles.emptyHint}>
+                  Garde tes idées d'entraînement, retours match, choses à
+                  retenir : tape sur ＋ pour en ajouter une.
+                </Text>
+              </Card>
+            ) : (
+              notes.map((n) => {
+                const isEditing = editingNoteId === n.id;
+                const busy = noteBusy === n.id;
+                return (
+                  <Card key={n.id} style={styles.noteCard}>
+                    {isEditing ? (
+                      <>
+                        <TextInput
+                          style={[styles.noteInput, styles.noteInputMultiline]}
+                          value={draft}
+                          onChangeText={setDraft}
+                          placeholder="Ta note…"
+                          placeholderTextColor="#8E8E93"
+                          multiline
+                          textAlignVertical="top"
+                          autoFocus
+                        />
+                        <View style={styles.noteActions}>
+                          <Button
+                            label="Annuler"
+                            variant="secondary"
+                            onPress={cancelEdit}
+                          />
+                          <View style={{ width: spacing.sm }} />
+                          <Button label="Enregistrer" onPress={saveNote} />
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.noteContent}>{n.content}</Text>
+                        <View style={styles.noteFooter}>
+                          <Text style={styles.noteMeta}>
+                            {formatDate(n.updatedAt)}
+                          </Text>
+                          <View style={styles.noteToolbar}>
+                            <Pressable
+                              onPress={() => startEditNote(n)}
+                              style={styles.noteIconBtn}
+                              disabled={busy}
+                              hitSlop={6}
+                            >
+                              <Text style={styles.noteIconLabel}>✎</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => deleteNote(n)}
+                              style={styles.noteIconDelete}
+                              disabled={busy}
+                              hitSlop={6}
+                            >
+                              {busy ? (
+                                <ActivityIndicator size="small" />
+                              ) : (
+                                <Text style={styles.noteDeleteLabel}>🗑</Text>
+                              )}
+                            </Pressable>
+                          </View>
+                        </View>
+                      </>
+                    )}
+                  </Card>
+                );
+              })
+            )}
           </View>
 
           <View style={styles.section}>
@@ -285,12 +575,58 @@ const makeStyles = (c: ThemedColors) =>
       justifyContent: 'center',
     },
     cameraGlyph: { fontSize: 18 },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
     name: { ...typography.h2, color: c.textPrimary, textAlign: 'center' },
-    roleHint: {
+    nameEditHint: {
       ...typography.bodyBold,
       color: c.primary,
-      marginTop: 2,
+      fontSize: 18,
+    },
+    nameEditRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      alignSelf: 'stretch',
+      paddingHorizontal: spacing.md,
+    },
+    nameInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      ...typography.h3,
+      color: c.textPrimary,
+      backgroundColor: c.background,
       textAlign: 'center',
+    },
+    iconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconBtnLabel: { color: c.onPrimary, fontWeight: '700', fontSize: 20 },
+    iconBtnGhost: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: c.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconBtnGhostLabel: {
+      color: c.textPrimary,
+      fontWeight: '700',
+      fontSize: 22,
+      lineHeight: 24,
     },
     email: {
       ...typography.caption,
@@ -298,38 +634,145 @@ const makeStyles = (c: ThemedColors) =>
       marginTop: 4,
       textAlign: 'center',
     },
+    error: {
+      ...typography.caption,
+      color: c.danger,
+      marginTop: spacing.sm,
+      textAlign: 'center',
+    },
+    section: {
+      gap: spacing.sm,
+    },
+    sectionTitle: {
+      ...typography.h3,
+      color: c.textPrimary,
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    addBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBtnLabel: {
+      color: c.onPrimary,
+      fontWeight: '700',
+      fontSize: 18,
+      lineHeight: 20,
+    },
     teamCard: {},
     teamRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
     },
-    teamLabel: {
-      ...typography.micro,
-      color: c.textMuted,
-      textTransform: 'uppercase',
+    teamLogoWrap: {
+      position: 'relative',
     },
-    teamName: {
-      ...typography.h3,
-      color: c.textPrimary,
+    teamLogoPlaceholder: {
+      width: 56,
+      height: 56,
+      borderRadius: 14,
+      backgroundColor: c.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: c.border,
+      borderStyle: 'dashed',
+    },
+    teamLogoPlaceholderGlyph: {
+      fontSize: 24,
+      color: c.primary,
+      fontWeight: '700',
+    },
+    teamLogoBadge: {
+      position: 'absolute',
+      right: -4,
+      bottom: -4,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: c.surface,
+      borderWidth: 1.5,
+      borderColor: c.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    teamName: { ...typography.h3, color: c.textPrimary },
+    teamHint: {
+      ...typography.caption,
+      color: c.textMuted,
       marginTop: 2,
     },
-    section: {
-      gap: 0,
+    notesLoading: {
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
     },
-    sectionTitle: {
-      ...typography.h3,
+    emptyCard: {
+      alignItems: 'center',
+      paddingVertical: spacing.lg,
+    },
+    emptyTitle: {
+      ...typography.bodyBold,
       color: c.textPrimary,
-      marginBottom: spacing.sm,
     },
-    label: {
-      ...typography.micro,
+    emptyHint: {
+      ...typography.caption,
       color: c.textMuted,
-      textTransform: 'uppercase',
-      marginTop: spacing.sm,
-      marginBottom: 6,
+      marginTop: 4,
+      textAlign: 'center',
+      paddingHorizontal: spacing.md,
+      lineHeight: 18,
     },
-    input: {
+    noteCard: {},
+    noteContent: {
+      ...typography.body,
+      color: c.textPrimary,
+      lineHeight: 22,
+    },
+    noteFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
+    },
+    noteMeta: {
+      ...typography.caption,
+      color: c.textMuted,
+    },
+    noteToolbar: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    noteIconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    noteIconLabel: {
+      color: c.primary,
+      fontWeight: '700',
+      fontSize: 14,
+    },
+    noteIconDelete: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.dangerSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    noteDeleteLabel: { fontSize: 14 },
+    noteInput: {
       borderWidth: 1,
       borderColor: c.border,
       borderRadius: radius.md,
@@ -337,20 +780,15 @@ const makeStyles = (c: ThemedColors) =>
       paddingVertical: 12,
       ...typography.body,
       color: c.textPrimary,
-      backgroundColor: c.surface,
+      backgroundColor: c.background,
     },
-    inputMultiline: {
+    noteInputMultiline: {
       minHeight: 96,
       paddingTop: 10,
     },
-    error: {
-      ...typography.caption,
-      color: c.danger,
-      marginTop: spacing.sm,
-    },
-    info: {
-      ...typography.caption,
-      color: c.successText,
+    noteActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
       marginTop: spacing.sm,
     },
   });
