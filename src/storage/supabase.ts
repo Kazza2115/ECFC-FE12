@@ -9,10 +9,11 @@ const SUPABASE_ANON_KEY =
 
 export const PHOTO_BUCKET = 'ecfc-photos';
 
-// Legacy — Carouge's original team id. Kept as a fallback for the very
-// short window between app launch and AuthContext hydration so any code
-// that reads getActiveTeamId() before login does not crash.
-export const LEGACY_TEAM_ID = 'ecfc-juniors';
+// Sentinel value returned by getActiveTeamId() before a coach has
+// signed in / claimed a team. It deliberately matches no real team
+// row, so any read or write that escapes through it is rejected by
+// Supabase RLS — a noisy failure is much safer than a silent leak.
+const UNATTACHED_TEAM_ID = '__unattached__';
 
 let activeTeamId: string | null = null;
 
@@ -21,15 +22,8 @@ export function setActiveTeamId(id: string | null): void {
 }
 
 export function getActiveTeamId(): string {
-  // We never want to silently write into the wrong team, so during the
-  // pre-auth phase we still return the legacy id (read-only operations
-  // will be denied by RLS anyway once it is enabled).
-  return activeTeamId ?? LEGACY_TEAM_ID;
+  return activeTeamId ?? UNATTACHED_TEAM_ID;
 }
-
-// Keep the named export for any code that still reads TEAM_ID directly.
-// New code should call getActiveTeamId() instead.
-export const TEAM_ID = LEGACY_TEAM_ID;
 
 // Auth session storage. AsyncStorage on native, localStorage on web —
 // the same backend our `kv` helper uses, so the user stays signed in

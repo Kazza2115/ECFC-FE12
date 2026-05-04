@@ -107,18 +107,3 @@ export const db = {
     ]);
   },
 };
-
-export const SEED_PLAYERS = [
-  'Léo Martin',
-  'Noah Dupont',
-  'Hugo Fernandez',
-  'Liam Rossi',
-  'Ethan Müller',
-  'Adam Benali',
-  'Lucas Ribeiro',
-  'Nolan Schmid',
-  'Arthur Bonnard',
-  'Gabriel Perez',
-  'Mateo Silva',
-  'Tom Favre',
-];
