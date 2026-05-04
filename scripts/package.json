@@ -1,0 +1,10 @@
+{
+  "name": "ecfc-migration",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated dependencies for the Carouge data migration. Independent from the app's package.json so a desync of the main lockfile cannot break the migration workflow.",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}

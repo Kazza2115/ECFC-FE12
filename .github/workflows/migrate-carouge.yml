@@ -11,8 +11,7 @@ name: Migrate Carouge data
 #     NEW_URL          = https://NEWREF.supabase.co
 #     NEW_SERVICE_KEY  = eyJ... (service_role of the NEW project)
 #
-# After the workflow succeeds, delete those secrets — you don't need
-# them anymore. Then rotate the service_role of any project you keep.
+# After the workflow succeeds, delete those secrets.
 
 on:
   workflow_dispatch: {}
@@ -29,15 +28,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci --no-audit --no-fund --ignore-scripts
+      # Install only the migration's own dependencies (just
+      # @supabase/supabase-js). The app's package.json / lockfile is
+      # never touched, so a desync there can't break the migration.
+      - name: Install migration deps
+        working-directory: scripts
+        run: npm install --no-audit --no-fund --silent
 
       - name: Run migration
+        working-directory: scripts
         env:
           OLD_URL: ${{ secrets.OLD_URL }}
           OLD_SERVICE_KEY: ${{ secrets.OLD_SERVICE_KEY }}
           NEW_URL: ${{ secrets.NEW_URL }}
           NEW_SERVICE_KEY: ${{ secrets.NEW_SERVICE_KEY }}
-        run: node scripts/migrate-carouge.mjs
+        run: node migrate-carouge.mjs
