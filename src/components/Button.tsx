@@ -1,5 +1,5 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
@@ -24,28 +24,71 @@ export function Button({
 }: Props) {
   const styles = useThemedStyles(makeStyles);
   const variantStyles = styles.variants[variant];
+
+  // Spring-driven press feedback for that HeroUI "tactile" feel.
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 0.96,
+        useNativeDriver: true,
+        damping: 18,
+        mass: 0.7,
+        stiffness: 300,
+      }),
+      Animated.timing(opacity, {
+        toValue: 0.88,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+  const handlePressOut = () => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1,
+        useNativeDriver: true,
+        damping: 16,
+        mass: 0.7,
+        stiffness: 280,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   return (
     <Pressable
       onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.base,
-        variantStyles.container,
-        fullWidth && styles.fullWidth,
-        disabled && styles.disabled,
-        pressed && styles.pressed,
-      ]}
+      style={fullWidth ? styles.fullWidth : undefined}
     >
-      {icon ? <View style={styles.icon}>{icon}</View> : null}
-      <Text style={[styles.label, variantStyles.label]}>{label}</Text>
+      <Animated.View
+        style={[
+          styles.base,
+          variantStyles.container,
+          fullWidth && styles.fullWidth,
+          disabled && styles.disabled,
+          { transform: [{ scale }], opacity },
+        ]}
+      >
+        {icon ? <View style={styles.icon}>{icon}</View> : null}
+        <Text style={[styles.label, variantStyles.label]}>{label}</Text>
+      </Animated.View>
     </Pressable>
   );
 }
 
 const makeStyles = (c: ThemedColors) => {
   // HeroUI signature: solid colored buttons sit on a soft glow tinted
-  // by the brand color. The glow is invisible on Android < API 28 but
-  // it's a progressive enhancement, not a regression.
+  // by the brand color.
   const primaryShadow = {
     shadowColor: c.primary,
     shadowOffset: { width: 0, height: 6 },
@@ -89,7 +132,6 @@ const makeStyles = (c: ThemedColors) => {
       gap: 8,
     },
     fullWidth: { alignSelf: 'stretch' },
-    pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
     disabled: { opacity: 0.4 },
     label: {
       ...typography.bodyBold,

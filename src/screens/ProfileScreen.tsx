@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -289,6 +290,7 @@ export function ProfileScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
         >
           {/* Identity ------------------------------------------------- */}
+          <AnimatedFadeIn delay={0}>
           <Card style={styles.identityCard}>
             <Pressable
               onPress={photoBusy ? undefined : handlePhoto}
@@ -361,8 +363,10 @@ export function ProfileScreen({ navigation }: Props) {
               <Text style={styles.error}>{identityError}</Text>
             ) : null}
           </Card>
+          </AnimatedFadeIn>
 
           {/* Mes équipes -------------------------------------------- */}
+          <AnimatedFadeIn delay={80}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mes équipes</Text>
             <Card style={styles.teamCard}>
@@ -406,8 +410,10 @@ export function ProfileScreen({ navigation }: Props) {
               ) : null}
             </Card>
           </View>
+          </AnimatedFadeIn>
 
           {/* Coin notes --------------------------------------------- */}
+          <AnimatedFadeIn delay={160}>
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>Coin notes</Text>
@@ -528,7 +534,9 @@ export function ProfileScreen({ navigation }: Props) {
               })
             )}
           </View>
+          </AnimatedFadeIn>
 
+          <AnimatedFadeIn delay={240}>
           <View style={styles.section}>
             <Button
               label="Se déconnecter"
@@ -537,6 +545,7 @@ export function ProfileScreen({ navigation }: Props) {
               fullWidth
             />
           </View>
+          </AnimatedFadeIn>
 
           <View style={{ height: spacing.xl }} />
         </ScrollView>

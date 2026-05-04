@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Avatar } from '@/components/Avatar';
+import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
@@ -153,6 +154,7 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
+        <AnimatedFadeIn delay={0}>
         <Card style={styles.identityCard}>
           <View style={styles.identityRow}>
             <Avatar name={player.name} photoUri={player.photoUri} size={72} />
@@ -166,7 +168,9 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
             </View>
           </View>
         </Card>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={70}>
         <View style={styles.ringRow}>
           {trainingStats && trainingStats.totalSessions > 0 ? (
             <Card style={styles.ringCard}>
@@ -200,7 +204,9 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
             </Card>
           ) : null}
         </View>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={140}>
         <View style={styles.kpiRow}>
           <KpiCard
             label="Temps de jeu"
@@ -208,7 +214,9 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
           />
           <KpiCard label="Matchs joués" value={String(matchesPlayed)} />
         </View>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={210}>
         <Text style={styles.sectionHeader}>Stats matchs</Text>
         <Card style={styles.eventsCard}>
           {totals.goals + totals.assists + totals.key + totals.yellow + totals.red === 0 ? (
@@ -226,9 +234,10 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
             </View>
           )}
         </Card>
+        </AnimatedFadeIn>
 
         {trainingStats && trainingStats.totalSessions > 0 ? (
-          <>
+          <AnimatedFadeIn delay={280}>
             <Text style={styles.sectionHeader}>Détail entraînements</Text>
             <Card padded={false} style={styles.detailCard}>
               <DetailRow
@@ -278,11 +287,11 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
             <View style={styles.barWrap}>
               <ProgressBar value={trainingStats.ratio} height={8} />
             </View>
-          </>
+          </AnimatedFadeIn>
         ) : null}
 
         {playerSessions.length > 0 ? (
-          <>
+          <AnimatedFadeIn delay={350}>
             <Text style={styles.sectionHeader}>Activité récente</Text>
             <Card padded={false} style={styles.detailCard}>
               {playerSessions.slice(0, 12).map((row, index, arr) => (
@@ -359,7 +368,7 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
                 </Pressable>
               ))}
             </Card>
-          </>
+          </AnimatedFadeIn>
         ) : null}
 
         <View style={{ height: spacing.xl }} />

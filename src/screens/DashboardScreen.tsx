@@ -15,6 +15,7 @@ import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { GradientBackdrop } from '@/components/GradientBackdrop';
 import { TeamLogo } from '@/components/TeamLogo';
 import { SyncPill } from '@/components/SyncPill';
@@ -112,33 +113,46 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {/* Full-bleed soft halo behind the header — extends behind the
+          status bar on native, gives the dashboard that HeroUI hero
+          glow without taking layout space. */}
+      <View pointerEvents="none" style={styles.topHalo}>
+        <GradientBackdrop
+          from={colors.primarySoft}
+          to={colors.background}
+          opacity={1}
+        />
+      </View>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.headerControls}>
-            <SyncPill
-              status={syncStatus}
-              lastError={lastSyncError}
-              onRefresh={refreshFromCloud}
-            />
-            <ThemeToggle />
-            <ProfileMenu />
-          </View>
-          <View style={styles.headerHero}>
-            <TeamLogo
-              teamId={profile?.teamId}
-              logoUrl={profile?.teamLogoUrl}
-              size={52}
-            />
-            <View style={styles.headerHeroText}>
-              <Text style={styles.subtitle}>{teamLabel}</Text>
-              <Text style={styles.greeting}>{greeting}</Text>
+        <AnimatedFadeIn delay={0}>
+          <View style={styles.header}>
+            <View style={styles.headerControls}>
+              <SyncPill
+                status={syncStatus}
+                lastError={lastSyncError}
+                onRefresh={refreshFromCloud}
+              />
+              <ThemeToggle />
+              <ProfileMenu />
+            </View>
+            <View style={styles.headerHero}>
+              <TeamLogo
+                teamId={profile?.teamId}
+                logoUrl={profile?.teamLogoUrl}
+                size={52}
+              />
+              <View style={styles.headerHeroText}>
+                <Text style={styles.subtitle}>{teamLabel}</Text>
+                <Text style={styles.greeting}>{greeting}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={70}>
         <Card style={styles.heroCard}>
           <GradientBackdrop
             from={colors.primarySoft}
@@ -164,7 +178,9 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             </View>
           </View>
         </Card>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={140}>
         <View style={styles.statsRow}>
           <StatCard
             label="Entraînements"
@@ -178,7 +194,9 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             accent={colors.accent}
           />
         </View>
+        </AnimatedFadeIn>
 
+        <AnimatedFadeIn delay={210}>
         <View style={styles.actions}>
           <View style={styles.actionsRow}>
             <View style={styles.actionCol}>
@@ -208,8 +226,10 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             fullWidth
           />
         </View>
+        </AnimatedFadeIn>
 
         {upcoming.length > 0 ? (
+          <AnimatedFadeIn delay={280}>
           <View style={styles.upcomingBlock}>
             <Text style={styles.sectionLabel}>Prochains entraînements</Text>
             <View style={styles.upcomingRow}>
@@ -224,8 +244,10 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               ))}
             </View>
           </View>
+          </AnimatedFadeIn>
         ) : null}
 
+        <AnimatedFadeIn delay={upcoming.length > 0 ? 350 : 280}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Top assiduité</Text>
           <Pressable onPress={() => navigation.navigate('Stats')}>
@@ -267,6 +289,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             ))}
           </Card>
         )}
+        </AnimatedFadeIn>
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
@@ -352,6 +375,14 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
 
 const makeStyles = (c: ThemedColors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: c.background },
+  topHalo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 280,
+    overflow: 'hidden',
+  },
   content: { paddingBottom: spacing.xxl },
   header: {
     paddingHorizontal: spacing.lg,
