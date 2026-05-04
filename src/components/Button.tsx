@@ -43,13 +43,30 @@ export function Button({
 }
 
 const makeStyles = (c: ThemedColors) => {
+  // HeroUI signature: solid colored buttons sit on a soft glow tinted
+  // by the brand color. The glow is invisible on Android < API 28 but
+  // it's a progressive enhancement, not a regression.
+  const primaryShadow = {
+    shadowColor: c.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
+  };
+  const dangerShadow = {
+    shadowColor: c.danger,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
+  };
   const variants: Record<Variant, { container: object; label: object }> = {
     primary: {
-      container: { backgroundColor: c.primary },
+      container: { backgroundColor: c.primary, ...primaryShadow },
       label: { color: c.onPrimary, fontWeight: '700' },
     },
     secondary: {
-      container: { backgroundColor: c.accentSoft },
+      container: { backgroundColor: c.primarySoft },
       label: { color: c.primary, fontWeight: '600' },
     },
     ghost: {
@@ -57,7 +74,7 @@ const makeStyles = (c: ThemedColors) => {
       label: { color: c.primary, fontWeight: '600' },
     },
     danger: {
-      container: { backgroundColor: c.danger },
+      container: { backgroundColor: c.danger, ...dangerShadow },
       label: { color: c.onPrimary, fontWeight: '700' },
     },
   };
@@ -68,11 +85,11 @@ const makeStyles = (c: ThemedColors) => {
       justifyContent: 'center',
       paddingVertical: 14,
       paddingHorizontal: spacing.lg,
-      borderRadius: radius.md,
+      borderRadius: radius.lg,
       gap: 8,
     },
     fullWidth: { alignSelf: 'stretch' },
-    pressed: { opacity: 0.85, transform: [{ scale: 0.985 }] },
+    pressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
     disabled: { opacity: 0.4 },
     label: {
       ...typography.bodyBold,

@@ -1,12 +1,14 @@
-// Light + dark palettes. The active palette is applied at app boot
-// via Object.assign on the exported `colors` / `shadow` objects, then
-// the navigator is remounted so every StyleSheet.create snapshots the
-// new values.
+// Light + dark palettes — HeroUI-inspired vibe: vivid primary, soft
+// pastel accents, gentle shadows. Applied at boot via Object.assign on
+// the exported `colors` / `shadow` objects so every StyleSheet.create
+// snapshots the right values once the navigator remounts.
 
 export type Palette = {
   primary: string;
   primaryDark: string;
   primarySoft: string;
+  // Subtle gradient end stop, used by the primary CTA / hero card.
+  primaryGradient: string;
   accent: string;
   accentSoft: string;
   gold: string;
@@ -55,86 +57,95 @@ export type ShadowPalette = {
   };
 };
 
+// HeroUI default brand blue (#006FEE) gives the app a more energetic,
+// approachable feel than the previous navy. The gradient stop pulls
+// slightly toward purple — a tiny touch that lifts hero CTAs.
 export const lightPalette: Palette = {
-  primary: '#1E40AF',
-  primaryDark: '#172E66',
-  primarySoft: '#E5EDFC',
-  accent: '#000000',
-  accentSoft: '#F2F2F7',
-  gold: '#F4C430',
+  primary: '#006FEE',
+  primaryDark: '#005BC4',
+  primarySoft: '#E6F1FE',
+  primaryGradient: '#3094FF',
+  accent: '#11181C',
+  accentSoft: '#F4F4F5',
+  gold: '#F5A524',
 
-  background: '#F2F2F7',
+  background: '#FAFAFA',
   surface: '#FFFFFF',
-  surfaceMuted: '#F9F9FB',
-  border: '#E5E5EA',
+  surfaceMuted: '#F4F4F5',
+  border: '#E4E4E7',
 
-  textPrimary: '#000000',
-  textSecondary: '#3C3C4399',
-  textMuted: '#8E8E93',
-  textDisabled: '#C7C7CC',
+  textPrimary: '#11181C',
+  textSecondary: '#52525B',
+  textMuted: '#A1A1AA',
+  textDisabled: '#D4D4D8',
 
-  success: '#34C759',
-  successSoft: 'rgba(52, 199, 89, 0.12)',
-  successText: '#0F7A3B',
-  danger: '#FF3B30',
-  dangerSoft: 'rgba(255, 59, 48, 0.10)',
-  warning: '#FF9500',
-  warningSoft: 'rgba(255, 149, 0, 0.12)',
-  warningText: '#B45309',
-  info: '#5AC8FA',
+  success: '#17C964',
+  successSoft: 'rgba(23, 201, 100, 0.14)',
+  successText: '#0E793C',
+  danger: '#F31260',
+  dangerSoft: 'rgba(243, 18, 96, 0.10)',
+  warning: '#F5A524',
+  warningSoft: 'rgba(245, 165, 36, 0.14)',
+  warningText: '#A05E03',
+  info: '#7828C8',
 
-  overlay: 'rgba(0, 0, 0, 0.4)',
+  overlay: 'rgba(17, 24, 28, 0.45)',
 
   onPrimary: '#FFFFFF',
 };
 
 export const darkPalette: Palette = {
-  primary: '#3B82F6',
-  primaryDark: '#1E40AF',
-  primarySoft: 'rgba(59, 130, 246, 0.18)',
-  accent: '#FFFFFF',
-  accentSoft: '#1C1C1E',
-  gold: '#F4C430',
+  primary: '#338EF7',
+  primaryDark: '#006FEE',
+  primarySoft: 'rgba(51, 142, 247, 0.20)',
+  primaryGradient: '#5DA8FF',
+  accent: '#ECEDEE',
+  accentSoft: '#27272A',
+  gold: '#F5A524',
 
-  background: '#000000',
-  surface: '#1C1C1E',
-  surfaceMuted: '#2C2C2E',
-  border: '#38383A',
+  // Slightly off-black so cards have something to lift away from.
+  background: '#0B0B0F',
+  surface: '#18181B',
+  surfaceMuted: '#27272A',
+  border: '#3F3F46',
 
-  textPrimary: '#FFFFFF',
-  textSecondary: '#EBEBF599',
-  textMuted: '#8E8E93',
-  textDisabled: '#48484A',
+  textPrimary: '#ECEDEE',
+  textSecondary: '#A1A1AA',
+  textMuted: '#71717A',
+  textDisabled: '#52525B',
 
-  success: '#30D158',
-  successSoft: 'rgba(48, 209, 88, 0.20)',
-  successText: '#30D158',
-  danger: '#FF453A',
-  dangerSoft: 'rgba(255, 69, 58, 0.20)',
-  warning: '#FF9F0A',
-  warningSoft: 'rgba(255, 159, 10, 0.20)',
-  warningText: '#FFB340',
-  info: '#64D2FF',
+  success: '#1FCD68',
+  successSoft: 'rgba(31, 205, 104, 0.20)',
+  successText: '#1FCD68',
+  danger: '#F54180',
+  dangerSoft: 'rgba(245, 65, 128, 0.20)',
+  warning: '#F7B750',
+  warningSoft: 'rgba(247, 183, 80, 0.20)',
+  warningText: '#F7B750',
+  info: '#9353D3',
 
-  overlay: 'rgba(0, 0, 0, 0.6)',
+  overlay: 'rgba(0, 0, 0, 0.65)',
 
   onPrimary: '#FFFFFF',
 };
 
+// Soft, blueish shadow in light mode — much calmer than a hard black,
+// gives the HeroUI floaty look. Dark mode keeps shadows off (cards
+// already have enough contrast against the near-black background).
 export const lightShadow: ShadowPalette = {
   card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 1,
+    shadowColor: '#0F1F44',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    elevation: 2,
   },
   floating: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    elevation: 4,
+    shadowColor: '#0F1F44',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 6,
   },
 };
 

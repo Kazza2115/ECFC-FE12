@@ -15,6 +15,7 @@ import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { GradientBackdrop } from '@/components/GradientBackdrop';
 import { TeamLogo } from '@/components/TeamLogo';
 import { SyncPill } from '@/components/SyncPill';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -139,6 +140,12 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         </View>
 
         <Card style={styles.heroCard}>
+          <GradientBackdrop
+            from={colors.primarySoft}
+            to={colors.surface}
+            radius={radius.lg}
+            opacity={1}
+          />
           <View style={styles.heroRow}>
             <ProgressRing value={globalRatio} size={104} strokeWidth={10} label="actif" />
             <View style={styles.heroText}>
@@ -380,7 +387,11 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  heroCard: { marginHorizontal: spacing.lg, marginTop: spacing.xs },
+  heroCard: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },
   heroTitle: { ...typography.h2, color: c.textPrimary },
