@@ -9,6 +9,7 @@ import { SessionScreen } from '@/screens/SessionScreen';
 import { SessionsListScreen } from '@/screens/SessionsListScreen';
 import { PlayersScreen } from '@/screens/PlayersScreen';
 import { PlayerDetailScreen } from '@/screens/PlayerDetailScreen';
+import { ProfileScreen } from '@/screens/ProfileScreen';
 import { StatsScreen } from '@/screens/StatsScreen';
 import { TabIcon } from '@/components/TabIcon';
 import { colors, typography } from '@/theme';
@@ -26,6 +27,7 @@ export type RootStackParamList = {
   MatchLive: { sessionId: string };
   MatchSheet: { sessionId: string };
   PlayerDetail: { playerId: string };
+  Profile: undefined;
 };
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -117,6 +119,11 @@ export function AppNavigator() {
         name="PlayerDetail"
         component={PlayerDetailScreen}
         options={{ title: 'Joueur' }}
+      />
+      <Stack.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: 'Mon profil' }}
       />
     </Stack.Navigator>
   );

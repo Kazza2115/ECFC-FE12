@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { auth, type CoachProfile } from '@/storage/remote';
+import { auth, type CoachProfile, type CoachProfilePatch } from '@/storage/remote';
 import { setActiveTeamId } from '@/storage/supabase';
 import { db } from '@/storage/database';
 
@@ -23,8 +23,10 @@ type AuthContextValue = {
   // Onboarding actions (called from the OnboardingScreen).
   claimTeam: (code: string, displayName: string) => Promise<void>;
   createTeam: (teamName: string, displayName: string) => Promise<void>;
-  // Update the coach name shown in the UI.
-  renameCoach: (next: string) => Promise<void>;
+  // Update any subset of the coach profile fields.
+  updateProfile: (patch: CoachProfilePatch) => Promise<void>;
+  // Replace / clear the coach's profile photo. Pass undefined to remove.
+  setCoachPhoto: (uri: string | undefined) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -36,7 +38,8 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
   claimTeam: async () => {},
   createTeam: async () => {},
-  renameCoach: async () => {},
+  updateProfile: async () => {},
+  setCoachPhoto: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -152,11 +155,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [session, refreshProfile],
   );
 
-  const renameCoach = useCallback(
-    async (next: string) => {
+  const updateProfile = useCallback(
+    async (patch: CoachProfilePatch) => {
       const userId = session?.user?.id;
       if (!userId) return;
-      await auth.updateDisplayName(userId, next);
+      await auth.updateCoach(userId, patch);
+      await refreshProfile(userId);
+    },
+    [session, refreshProfile],
+  );
+
+  const setCoachPhoto = useCallback(
+    async (uri: string | undefined) => {
+      const userId = session?.user?.id;
+      if (!userId) return;
+      if (!uri) {
+        try {
+          await auth.deleteCoachPhoto(userId);
+        } catch {}
+        await auth.updateCoach(userId, { photoUrl: null });
+      } else {
+        const url = await auth.uploadCoachPhoto(userId, uri);
+        await auth.updateCoach(userId, { photoUrl: url });
+      }
       await refreshProfile(userId);
     },
     [session, refreshProfile],
@@ -172,7 +193,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       claimTeam,
       createTeam,
-      renameCoach,
+      updateProfile,
+      setCoachPhoto,
     }),
     [
       loading,
@@ -183,7 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       claimTeam,
       createTeam,
-      renameCoach,
+      updateProfile,
+      setCoachPhoto,
     ],
   );
 

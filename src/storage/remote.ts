@@ -473,7 +473,19 @@ export type CoachProfile = {
   displayName: string;
   teamId: string;
   teamName: string;
+  photoUrl?: string | null;
+  role?: string | null;
+  phone?: string | null;
+  bio?: string | null;
 };
+
+export type CoachProfilePatch = Partial<{
+  displayName: string;
+  role: string | null;
+  phone: string | null;
+  bio: string | null;
+  photoUrl: string | null;
+}>;
 
 function teamIdFromString(name: string): string {
   // Slug + short random suffix so two coaches can use the same team
@@ -522,7 +534,7 @@ export const auth = {
   async fetchProfile(userId: string): Promise<CoachProfile | null> {
     const { data: profileRow, error: profErr } = await supabase
       .from('ecfc_coach_profiles')
-      .select('user_id, display_name, team_id')
+      .select('user_id, display_name, team_id, photo_url, role, phone, bio')
       .eq('user_id', userId)
       .maybeSingle();
     if (profErr) throw profErr;
@@ -540,6 +552,10 @@ export const auth = {
       displayName: profileRow.display_name,
       teamId: profileRow.team_id,
       teamName: teamRow?.name ?? 'Mon équipe',
+      photoUrl: profileRow.photo_url ?? null,
+      role: profileRow.role ?? null,
+      phone: profileRow.phone ?? null,
+      bio: profileRow.bio ?? null,
     };
   },
 
@@ -607,5 +623,51 @@ export const auth = {
       .update({ display_name: displayName.trim() })
       .eq('user_id', userId);
     if (error) throw error;
+  },
+
+  async updateCoach(userId: string, patch: CoachProfilePatch): Promise<void> {
+    const update: Record<string, unknown> = {};
+    if (patch.displayName !== undefined) {
+      const v = patch.displayName.trim();
+      if (!v) throw new Error('Le nom est requis.');
+      update.display_name = v;
+    }
+    if (patch.role !== undefined) update.role = patch.role?.trim() || null;
+    if (patch.phone !== undefined) update.phone = patch.phone?.trim() || null;
+    if (patch.bio !== undefined) update.bio = patch.bio?.trim() || null;
+    if (patch.photoUrl !== undefined) update.photo_url = patch.photoUrl;
+    if (Object.keys(update).length === 0) return;
+    update.updated_at = now();
+
+    const { error } = await supabase
+      .from('ecfc_coach_profiles')
+      .update(update)
+      .eq('user_id', userId);
+    if (error) throw error;
+  },
+
+  async uploadCoachPhoto(
+    userId: string,
+    dataUriOrLocalUri: string,
+  ): Promise<string> {
+    const response = await fetch(dataUriOrLocalUri);
+    const blob = await response.blob();
+    const path = `${getActiveTeamId()}/coaches/${userId}.jpg`;
+    const { error: upErr } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, blob, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '3600',
+      });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+    return `${data.publicUrl}?v=${Date.now()}`;
+  },
+
+  async deleteCoachPhoto(userId: string): Promise<void> {
+    await supabase.storage
+      .from(PHOTO_BUCKET)
+      .remove([`${getActiveTeamId()}/coaches/${userId}.jpg`]);
   },
 };
