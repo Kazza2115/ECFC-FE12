@@ -52,7 +52,19 @@ export function AuthScreen() {
         );
       }
     } catch (err: any) {
-      setError(err?.message ?? 'Erreur inconnue.');
+      const raw: string = err?.message ?? 'Erreur inconnue.';
+      // Friendlier translations of the most common Supabase Auth
+      // errors so the coach gets actionable feedback instead of
+      // English jargon.
+      const friendly =
+        /already registered|already exists/i.test(raw)
+          ? 'Cette adresse a déjà un compte. Connecte-toi avec ce mot de passe ou utilise une autre adresse.'
+          : /Invalid login credentials/i.test(raw)
+          ? 'Email ou mot de passe incorrect.'
+          : /Email not confirmed/i.test(raw)
+          ? 'Email non confirmé. Vérifie ta boîte mail ou demande à l\'admin de désactiver la confirmation.'
+          : raw;
+      setError(friendly);
     } finally {
       setBusy(false);
     }
@@ -151,7 +163,10 @@ export function AuthScreen() {
 
           <Text style={styles.footer}>
             Chaque coach a son propre profil. Tes données ne sont visibles
-            que par toi.
+            que par toi.{'\n'}
+            Si tu utilises déjà cette adresse sur une autre app du même
+            cloud, connecte-toi avec ce mot de passe — sinon, choisis une
+            autre adresse.
           </Text>
         </ScrollView>
       </KeyboardAvoidingView>

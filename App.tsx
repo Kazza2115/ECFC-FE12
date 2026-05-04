@@ -1,5 +1,5 @@
-import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
@@ -33,7 +33,7 @@ function MainShell() {
   };
 
   if (dataLoading) {
-    return <Loading />;
+    return <Loading message="Chargement de tes données…" />;
   }
 
   return (
@@ -44,10 +44,38 @@ function MainShell() {
   );
 }
 
-function Loading() {
+// Loading splash with a "Force sign-out" escape hatch. If the user is
+// stuck (e.g. corrupted session, unreachable Supabase) the link appears
+// after a few seconds and lets them break out.
+function Loading({ message }: { message?: string }) {
+  const { signOut } = useAuth();
+  const [showEscape, setShowEscape] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setShowEscape(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <View style={[styles.loading, { backgroundColor: colors.background }]}>
       <ActivityIndicator color={colors.primary} size="large" />
+      {message ? (
+        <Text style={[styles.loadingHint, { color: colors.textMuted }]}>
+          {message}
+        </Text>
+      ) : null}
+      {showEscape ? (
+        <Pressable
+          onPress={() => {
+            signOut().catch(() => {});
+          }}
+          style={styles.escape}
+        >
+          <Text style={[styles.escapeLabel, { color: colors.primary }]}>
+            Ça bloque ? Forcer la déconnexion
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -115,5 +143,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
+    padding: 24,
   },
+  loadingHint: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  escape: { marginTop: 12, padding: 12 },
+  escapeLabel: { fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
 });

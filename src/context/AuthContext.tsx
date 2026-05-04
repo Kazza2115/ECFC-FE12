@@ -77,22 +77,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!cancelled) setLoading(false);
     })();
 
-    const { data: sub } = auth.onAuthChange(async (next: Session | null) => {
+    const { data: sub } = auth.onAuthChange((next: Session | null) => {
       setSession(next ?? null);
       const newUid = next?.user?.id ?? null;
       const prevUid = lastUserIdRef.current;
       lastUserIdRef.current = newUid;
       if (newUid) {
-        await refreshProfile(newUid);
+        // Don't await here — the listener must return immediately so
+        // signIn() resolves quickly. Profile fetch happens in the
+        // background; any failure surfaces via setProfile(null) and
+        // the AuthGate routes the user to OnboardingScreen.
+        refreshProfile(newUid).catch(() => setProfile(null));
       } else {
         setProfile(null);
         // Identity changed (sign-out, account swap) → flush local cache so
         // the next coach starts with a clean slate and doesn't see stale
         // data from the previous account.
         if (prevUid) {
-          try {
-            await db.resetAll();
-          } catch {}
+          db.resetAll().catch(() => {});
         }
       }
     });

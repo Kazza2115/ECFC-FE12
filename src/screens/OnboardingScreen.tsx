@@ -44,7 +44,11 @@ export function OnboardingScreen() {
     try {
       await claimTeam(code, displayName);
     } catch (err: any) {
-      setError(err?.message ?? 'Le rattachement a échoué.');
+      const raw: string = err?.message ?? 'Le rattachement a échoué.';
+      const friendly = /duplicate key|already exists/i.test(raw)
+        ? 'Ce compte est déjà rattaché à une équipe. Déconnecte-toi puis reviens, ou demande à l\'admin de réinitialiser ton profil.'
+        : raw;
+      setError(friendly);
     } finally {
       setBusy(false);
     }
@@ -64,7 +68,11 @@ export function OnboardingScreen() {
     try {
       await createTeam(teamName, displayName);
     } catch (err: any) {
-      setError(err?.message ?? 'La création a échoué.');
+      const raw: string = err?.message ?? 'La création a échoué.';
+      const friendly = /duplicate key|already exists/i.test(raw)
+        ? 'Ce compte est déjà rattaché à une équipe. Déconnecte-toi puis reviens, ou demande à l\'admin de réinitialiser ton profil.'
+        : raw;
+      setError(friendly);
     } finally {
       setBusy(false);
     }
