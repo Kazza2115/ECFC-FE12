@@ -1,6 +1,6 @@
 # Migrer les données Carouge vers le nouveau projet Supabase
 
-Le nouveau projet (`ocycahwkqosuvlqxsfts`) est vierge. On va y copier tout
+Le nouveau projet (`qrkhlohmycrjlscsqpps`) est vierge. On va y copier tout
 ce qui se trouve dans l'ancien projet (`tivcwtzzhrsdfzxirjkw`) sous le
 `team_id = 'ecfc-juniors'` :
 
@@ -30,7 +30,7 @@ Depuis le dossier du projet :
 ```bash
 OLD_URL='https://tivcwtzzhrsdfzxirjkw.supabase.co' \
 OLD_SERVICE_KEY='eyJ...service_role...ANCIEN' \
-NEW_URL='https://ocycahwkqosuvlqxsfts.supabase.co' \
+NEW_URL='https://qrkhlohmycrjlscsqpps.supabase.co' \
 NEW_SERVICE_KEY='eyJ...service_role...NOUVEAU' \
 node scripts/migrate-carouge.mjs
 ```
