@@ -61,6 +61,10 @@ const authStorage =
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
+    // Custom storage key so this app's session never collides with
+    // any other app (e.g. Trivela) that talks to the same Supabase
+    // project from the same browser origin.
+    storageKey: 'coachhub-auth-v1',
     storage: authStorage as any,
     persistSession: true,
     autoRefreshToken: true,

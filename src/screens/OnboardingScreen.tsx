@@ -136,7 +136,7 @@ export function OnboardingScreen() {
               <Text style={styles.label}>Ton nom</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Julien Fustier"
+                placeholder="Prénom Nom"
                 placeholderTextColor={'#8E8E93'}
                 value={displayName}
                 onChangeText={setDisplayName}
@@ -145,7 +145,7 @@ export function OnboardingScreen() {
               <Text style={styles.label}>Code d'équipe</Text>
               <TextInput
                 style={styles.input}
-                placeholder="CAROUGE-FUSTIER-2026"
+                placeholder="ABCD-1234"
                 placeholderTextColor={'#8E8E93'}
                 autoCapitalize="characters"
                 autoCorrect={false}

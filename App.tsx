@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
+import { setActiveTeamId } from '@/storage/supabase';
 import { colors } from '@/theme';
 
 function MainShell() {
@@ -81,6 +82,12 @@ function AuthGate() {
       </>
     );
   }
+
+  // Apply the team_id synchronously *before* DataProvider mounts so
+  // its first remote.fetchAll() reads the right tenant. The
+  // AuthContext effect would set it too but only after children's
+  // effects fire, which is too late for the initial fetch.
+  setActiveTeamId(profile.teamId);
 
   // Re-key DataProvider on the active team_id so switching account or
   // claiming a fresh team starts the data layer from a clean state.
