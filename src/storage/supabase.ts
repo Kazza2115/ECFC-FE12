@@ -3,9 +3,9 @@ import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SUPABASE_URL = 'https://tivcwtzzhrsdfzxirjkw.supabase.co';
+const SUPABASE_URL = 'https://ocycahwkqosuvlqxsfts.supabase.co';
 const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpdmN3dHp6aHJzZGZ6eGlyamt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0MjM2MTMsImV4cCI6MjA5MTk5OTYxM30.BUfzNXfEobrz4CSeyBSj3I8To4F1eR-7AktC_kZfsO8';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9jeWNhaHdrcW9zdXZscXhzZnRzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4ODA1NzksImV4cCI6MjA5MzQ1NjU3OX0.3EaHFpCav08JMGHoVfg0zEjBoIlH5EzpvvJIFr6LR_k';
 
 export const PHOTO_BUCKET = 'ecfc-photos';
 
