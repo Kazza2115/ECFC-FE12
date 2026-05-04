@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
@@ -17,6 +18,7 @@ import { Card } from '@/components/Card';
 import { ClubLogo } from '@/components/ClubLogo';
 import { SyncPill } from '@/components/SyncPill';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ProfileMenu } from '@/components/ProfileMenu';
 import { EmptyState } from '@/components/EmptyState';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
@@ -48,7 +50,14 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     lastSyncError,
     refreshFromCloud,
   } = useData();
+  const { profile } = useAuth();
   const styles = useThemedStyles(makeStyles);
+
+  const coachFirstName = (profile?.displayName ?? '').split(' ')[0] || '';
+  const greeting = coachFirstName
+    ? `Bonjour ${coachFirstName}`
+    : 'Bonjour Coach';
+  const teamLabel = profile?.teamName ?? 'Étoile Carouge FC';
 
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
@@ -108,8 +117,8 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
       >
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.subtitle}>Étoile Carouge FC</Text>
-            <Text style={styles.greeting}>Bonjour Coach</Text>
+            <Text style={styles.subtitle}>{teamLabel}</Text>
+            <Text style={styles.greeting}>{greeting}</Text>
           </View>
           <View style={styles.headerRight}>
             <SyncPill
@@ -118,7 +127,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               onRefresh={refreshFromCloud}
             />
             <ThemeToggle />
-            <ClubLogo size={44} />
+            <ProfileMenu />
           </View>
         </View>
 

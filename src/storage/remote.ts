@@ -1,4 +1,4 @@
-import { PHOTO_BUCKET, TEAM_ID, supabase } from './supabase';
+import { PHOTO_BUCKET, getActiveTeamId, supabase } from './supabase';
 import type {
   Attendance,
   MatchEvent,
@@ -96,7 +96,7 @@ function toDbPlayer(p: Player): DbPlayer {
     id: p.id,
     name: p.name,
     photo_url: p.photoUri ?? null,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
     created_at: p.createdAt,
     updated_at: now(),
   };
@@ -129,7 +129,7 @@ function toDbSession(s: Session): DbSession {
     pause_intervals: s.pauseIntervals ?? null,
     quarter_teams: s.quarterTeams ?? null,
     current_quarter: s.currentQuarter ?? null,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
     created_at: s.createdAt,
     updated_at: now(),
   };
@@ -182,7 +182,7 @@ function toDbMatchEvent(e: MatchEvent): DbMatchEvent {
     type: e.type,
     minute: e.minute ?? null,
     note: e.note ?? null,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
     created_at: e.createdAt,
   };
 }
@@ -208,7 +208,7 @@ function toDbStint(st: PlayerStint): DbStint {
     start_at: st.startAt,
     end_at: st.endAt ?? null,
     quarter: st.quarter ?? null,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
   };
 }
 
@@ -229,7 +229,7 @@ function toDbSavedFormation(f: SavedFormation): DbSavedFormation {
     id: f.id,
     name: f.name,
     counts: f.counts,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
     created_at: f.createdAt,
   };
 }
@@ -249,7 +249,7 @@ function toDbSavedTeam(t: SavedTeam): DbSavedTeam {
     name: t.name,
     formation: t.formation ?? null,
     slots: t.slots,
-    team_id: TEAM_ID,
+    team_id: getActiveTeamId(),
     created_at: t.createdAt,
   };
 }
@@ -277,13 +277,13 @@ export type RemoteSnapshot = {
 export const remote = {
   async fetchAll(): Promise<RemoteSnapshot> {
     const [pRes, sRes, aRes, eRes, stRes, sfRes, stmRes] = await Promise.all([
-      supabase.from('ecfc_players').select('*').eq('team_id', TEAM_ID),
-      supabase.from('ecfc_sessions').select('*').eq('team_id', TEAM_ID),
+      supabase.from('ecfc_players').select('*').eq('team_id', getActiveTeamId()),
+      supabase.from('ecfc_sessions').select('*').eq('team_id', getActiveTeamId()),
       supabase.from('ecfc_attendances').select('*'),
-      supabase.from('ecfc_match_events').select('*').eq('team_id', TEAM_ID),
-      supabase.from('ecfc_player_stints').select('*').eq('team_id', TEAM_ID),
-      supabase.from('ecfc_saved_formations').select('*').eq('team_id', TEAM_ID),
-      supabase.from('ecfc_saved_teams').select('*').eq('team_id', TEAM_ID),
+      supabase.from('ecfc_match_events').select('*').eq('team_id', getActiveTeamId()),
+      supabase.from('ecfc_player_stints').select('*').eq('team_id', getActiveTeamId()),
+      supabase.from('ecfc_saved_formations').select('*').eq('team_id', getActiveTeamId()),
+      supabase.from('ecfc_saved_teams').select('*').eq('team_id', getActiveTeamId()),
     ]);
     if (pRes.error) throw pRes.error;
     if (sRes.error) throw sRes.error;
@@ -445,7 +445,7 @@ export const remote = {
   async uploadPhoto(playerId: string, dataUriOrLocalUri: string): Promise<string> {
     const response = await fetch(dataUriOrLocalUri);
     const blob = await response.blob();
-    const path = `players/${playerId}.jpg`;
+    const path = `${getActiveTeamId()}/players/${playerId}.jpg`;
     const { error: upErr } = await supabase.storage
       .from(PHOTO_BUCKET)
       .upload(path, blob, {
@@ -460,6 +460,136 @@ export const remote = {
   async deletePhoto(playerId: string): Promise<void> {
     await supabase.storage
       .from(PHOTO_BUCKET)
-      .remove([`players/${playerId}.jpg`]);
+      .remove([`${getActiveTeamId()}/players/${playerId}.jpg`]);
+  },
+};
+
+// ===========================================================================
+// Auth + multi-tenant identity
+// ===========================================================================
+
+export type CoachProfile = {
+  userId: string;
+  displayName: string;
+  teamId: string;
+  teamName: string;
+};
+
+function teamIdFromString(name: string): string {
+  // Slug + short random suffix so two coaches can use the same team
+  // name without colliding.
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 24);
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${slug || 'team'}-${suffix}`;
+}
+
+export const auth = {
+  async signIn(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (error) throw error;
+  },
+
+  async signUp(email: string, password: string): Promise<void> {
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+    if (error) throw error;
+  },
+
+  async signOut(): Promise<void> {
+    await supabase.auth.signOut();
+  },
+
+  async getSession() {
+    const { data } = await supabase.auth.getSession();
+    return data.session;
+  },
+
+  onAuthChange(cb: (session: any) => void) {
+    return supabase.auth.onAuthStateChange((_evt, session) => cb(session));
+  },
+
+  async fetchProfile(userId: string): Promise<CoachProfile | null> {
+    const { data: profileRow, error: profErr } = await supabase
+      .from('ecfc_coach_profiles')
+      .select('user_id, display_name, team_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (profErr) throw profErr;
+    if (!profileRow) return null;
+
+    const { data: teamRow, error: teamErr } = await supabase
+      .from('ecfc_teams')
+      .select('id, name')
+      .eq('id', profileRow.team_id)
+      .maybeSingle();
+    if (teamErr) throw teamErr;
+
+    return {
+      userId: profileRow.user_id,
+      displayName: profileRow.display_name,
+      teamId: profileRow.team_id,
+      teamName: teamRow?.name ?? 'Mon équipe',
+    };
+  },
+
+  async claimTeamByCode(code: string): Promise<{ teamId: string; teamName: string } | null> {
+    const trimmed = code.trim();
+    if (!trimmed) return null;
+    const { data, error } = await supabase
+      .from('ecfc_teams')
+      .select('id, name')
+      .eq('claim_code', trimmed)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return { teamId: data.id, teamName: data.name };
+  },
+
+  async createTeam(
+    name: string,
+    userId: string,
+  ): Promise<{ teamId: string; teamName: string }> {
+    const teamId = teamIdFromString(name);
+    const { error } = await supabase
+      .from('ecfc_teams')
+      .insert({
+        id: teamId,
+        name: name.trim(),
+        created_by: userId,
+      });
+    if (error) throw error;
+    return { teamId, teamName: name.trim() };
+  },
+
+  async createProfile(
+    userId: string,
+    displayName: string,
+    teamId: string,
+  ): Promise<void> {
+    const { error } = await supabase.from('ecfc_coach_profiles').insert({
+      user_id: userId,
+      display_name: displayName.trim(),
+      team_id: teamId,
+    });
+    if (error) throw error;
+  },
+
+  async updateDisplayName(userId: string, displayName: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_coach_profiles')
+      .update({ display_name: displayName.trim() })
+      .eq('user_id', userId);
+    if (error) throw error;
   },
 };

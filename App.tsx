@@ -7,13 +7,16 @@ import {
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AppNavigator } from '@/navigation/AppNavigator';
+import { AuthScreen } from '@/screens/AuthScreen';
+import { OnboardingScreen } from '@/screens/OnboardingScreen';
 import { colors } from '@/theme';
 
-function Shell() {
-  const { loading } = useData();
+function MainShell() {
+  const { loading: dataLoading } = useData();
   const { effective, version } = useTheme();
 
   const navTheme = {
@@ -28,13 +31,10 @@ function Shell() {
     },
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.loading, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
+  if (dataLoading) {
+    return <Loading />;
   }
+
   return (
     <NavigationContainer key={version} theme={navTheme}>
       <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
@@ -43,13 +43,61 @@ function Shell() {
   );
 }
 
+function Loading() {
+  return (
+    <View style={[styles.loading, { backgroundColor: colors.background }]}>
+      <ActivityIndicator color={colors.primary} size="large" />
+    </View>
+  );
+}
+
+function AuthGate() {
+  const { loading, session, profile } = useAuth();
+  const { effective } = useTheme();
+
+  if (loading) {
+    return (
+      <>
+        <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
+        <Loading />
+      </>
+    );
+  }
+
+  if (!session) {
+    return (
+      <>
+        <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
+        <AuthScreen />
+      </>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <>
+        <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
+        <OnboardingScreen />
+      </>
+    );
+  }
+
+  // Re-key DataProvider on the active team_id so switching account or
+  // claiming a fresh team starts the data layer from a clean state.
+  return (
+    <DataProvider key={profile.teamId}>
+      <MainShell />
+    </DataProvider>
+  );
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <ThemeProvider>
-        <DataProvider>
-          <Shell />
-        </DataProvider>
+        <AuthProvider>
+          <AuthGate />
+        </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
-import { db, SEED_PLAYERS } from '@/storage/database';
+import { db } from '@/storage/database';
 import { remote } from '@/storage/remote';
 import { supabase } from '@/storage/supabase';
 import {
@@ -152,7 +152,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         cachedStints,
         cachedSavedFormations,
         cachedSavedTeams,
-        seeded,
       ] = await Promise.all([
         db.getPlayers(),
         db.getSessions(),
@@ -161,7 +160,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         db.getStints(),
         db.getSavedFormations(),
         db.getSavedTeams(),
-        db.wasSeeded(),
       ]);
 
       setPlayers(cachedPlayers);
@@ -197,25 +195,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             db.saveStints(snap.stints),
             db.saveSavedFormations(snap.savedFormations),
             db.saveSavedTeams(snap.savedTeams),
-            db.markSeeded(),
           ]);
-        } else if (cachedPlayers.length === 0 && !seeded) {
-          const seedPlayers: Player[] = SEED_PLAYERS.map((name) => ({
-            id: uid(),
-            name,
-            createdAt: todayISO(),
-          }));
-          setPlayers(seedPlayers);
-          await Promise.all([
-            db.savePlayers(seedPlayers),
-            db.markSeeded(),
-          ]);
-          try {
-            for (const p of seedPlayers) await remote.upsertPlayer(p);
-          } catch (err) {
-            warn('seed-push', err);
-          }
         } else if (cachedPlayers.length > 0) {
+          // Coach with stale local data and an empty cloud (e.g. brand
+          // new account on a device that was used by a previous coach)
+          // — push the local copy back up so we don't lose it. The
+          // AuthProvider already calls db.resetAll on identity change,
+          // so this branch only fires for legitimate offline → online
+          // recovery scenarios.
           try {
             for (const p of cachedPlayers) await remote.upsertPlayer(p);
             for (const s of cachedSessions) await remote.upsertSession(s);
