@@ -80,11 +80,11 @@ console.log(`✓ copied ${iconCount} PWA icon(s) into dist/`);
 
 const SW_VERSION = `coachhub-${Date.now()}`;
 const sw = `// Coach Hub service worker — generated at build time.
-// Strategy:
-//   * Pre-cache the app shell (HTML + JS bundle entry) on install.
-//   * Network-first for everything else (Supabase API + assets) so
-//     fresh data wins, with a cache fallback when offline.
-//   * Static assets under /_expo / /assets are cached on first hit.
+// Strategy: NETWORK-FIRST for everything we control, with a cache
+// fallback for offline. Cache-first would be faster but it bit us:
+// devices that installed the PWA before a fix kept seeing the old
+// bundle until they manually cleared the cache. Network-first is a
+// few ms slower online, but you always get the latest deploy.
 
 const CACHE = '${SW_VERSION}';
 const SHELL = [
@@ -114,6 +114,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Allow the page to ask the SW to update itself immediately by
+// posting { type: 'SKIP_WAITING' }. The page does this whenever a
+// new SW is registered.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+function networkFirst(req, cache) {
+  return fetch(req)
+    .then((res) => {
+      if (res && res.ok) {
+        const copy = res.clone();
+        caches.open(cache).then((c) => c.put(req, copy)).catch(() => {});
+      }
+      return res;
+    })
+    .catch(() => caches.match(req));
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -123,8 +144,8 @@ self.addEventListener('fetch', (event) => {
   // the network directly.
   if (url.hostname.endsWith('.supabase.co')) return;
 
-  // For navigation requests, try network first, fall back to cached
-  // index.html so the app boots even fully offline.
+  // Navigation: network-first, fall back to cached index.html so the
+  // app boots even fully offline.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -138,20 +159,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin static assets: cache-first then network.
+  // Same-origin static assets: also network-first now. Cache only
+  // serves as the offline fallback.
   if (url.origin === self.location.origin) {
-    event.respondWith(
-      caches.match(req).then((hit) => {
-        if (hit) return hit;
-        return fetch(req).then((res) => {
-          if (res && res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        }).catch(() => hit);
-      }),
-    );
+    event.respondWith(networkFirst(req, CACHE));
   }
 });
 `;
@@ -177,9 +188,27 @@ const headInjections = `
 const swRegister = `
     <script>
       if ('serviceWorker' in navigator) {
+        var refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
         window.addEventListener('load', function () {
           navigator.serviceWorker
             .register('${BASE}/sw.js', { scope: '${BASE}/' })
+            .then(function (reg) {
+              if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              reg.addEventListener('updatefound', function () {
+                var sw = reg.installing;
+                if (!sw) return;
+                sw.addEventListener('statechange', function () {
+                  if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+                    sw.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              });
+            })
             .catch(function () { /* ignore — PWA is opt-in */ });
         });
       }

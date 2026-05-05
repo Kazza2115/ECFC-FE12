@@ -16,13 +16,14 @@ import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { FormationPitch } from '@/components/FormationPitch';
 import { TeamLibrarySheet } from '@/components/TeamLibrarySheet';
+import { EVENT_META, EVENT_ORDER } from '@/constants/events';
 import { findFormation, type FormationSlot } from '@/constants/formations';
 import { POSITION_META } from '@/constants/positions';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { confirm, notify } from '@/utils/confirm';
-import type { Player, Session } from '@/types';
+import type { MatchEventType, Player, Session } from '@/types';
 
 const QUARTER_DURATION_MS = 15 * 60 * 1000; // 15 min
 
@@ -50,6 +51,8 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     endQuarter,
     endMatch,
     getPlayerPlayMs,
+    getPlayerMatchTotals,
+    addMatchEvent,
     applyTeamToQuarter,
     liveMatch,
   } = useData();
@@ -64,7 +67,23 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
   );
   const [slotSheet, setSlotSheet] = useState<FormationSlot | null>(null);
   const [teamSheetOpen, setTeamSheetOpen] = useState<boolean>(false);
+  // Player picked from the time-list to receive an event (goal / card …)
+  const [eventSheet, setEventSheet] = useState<Player | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+
+  const handleAddEvent = async (player: Player, type: MatchEventType) => {
+    try {
+      await Haptics.notificationAsync(
+        type === 'goal' || type === 'assist'
+          ? Haptics.NotificationFeedbackType.Success
+          : type === 'red' || type === 'yellow'
+          ? Haptics.NotificationFeedbackType.Warning
+          : Haptics.NotificationFeedbackType.Success,
+      );
+    } catch {}
+    await addMatchEvent(sessionId, player.id, type);
+    setEventSheet(null);
+  };
 
   useEffect(() => {
     if (currentQuarter !== undefined) {
@@ -363,14 +382,17 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
             .map((p) => ({
               player: p,
               ms: getPlayerPlayMs(p.id, sessionId, now),
+              totals: getPlayerMatchTotals(p.id, sessionId),
             }))
             .sort((a, b) => b.ms - a.ms)
-            .map(({ player, ms }, idx, arr) => (
-              <View
+            .map(({ player, ms, totals }, idx, arr) => (
+              <Pressable
                 key={player.id}
-                style={[
+                onPress={() => setEventSheet(player)}
+                style={({ pressed }) => [
                   styles.timeRow,
                   idx < arr.length - 1 && styles.divider,
+                  pressed && { opacity: 0.85 },
                 ]}
               >
                 <Avatar
@@ -378,11 +400,32 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
                   photoUri={player.photoUri}
                   size={32}
                 />
-                <Text style={styles.timeName} numberOfLines={1}>
-                  {player.name}
-                </Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.timeName} numberOfLines={1}>
+                    {player.name}
+                  </Text>
+                  {totals.goals + totals.assists + totals.key + totals.yellow + totals.red > 0 ? (
+                    <View style={styles.totalsRow}>
+                      {totals.goals > 0 ? (
+                        <TotalBadge type="goal" value={totals.goals} />
+                      ) : null}
+                      {totals.assists > 0 ? (
+                        <TotalBadge type="assist" value={totals.assists} />
+                      ) : null}
+                      {totals.key > 0 ? (
+                        <TotalBadge type="key" value={totals.key} />
+                      ) : null}
+                      {totals.yellow > 0 ? (
+                        <TotalBadge type="yellow" value={totals.yellow} />
+                      ) : null}
+                      {totals.red > 0 ? (
+                        <TotalBadge type="red" value={totals.red} />
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
                 <Text style={styles.timeValue}>{fmt(ms)}</Text>
-              </View>
+              </Pressable>
             ))
         )}
       </Card>
@@ -421,7 +464,54 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
           applyTeamToQuarter(sessionId, selectedQuarter, team)
         }
       />
+
+      <BottomSheet
+        visible={!!eventSheet}
+        title={eventSheet ? `Évènement · ${eventSheet.name}` : ''}
+        onClose={() => setEventSheet(null)}
+      >
+        <View style={styles.eventGrid}>
+          {EVENT_ORDER.map((type) => {
+            const meta = EVENT_META[type];
+            return (
+              <Pressable
+                key={type}
+                onPress={() =>
+                  eventSheet && handleAddEvent(eventSheet, type)
+                }
+                style={[styles.eventOption, { backgroundColor: meta.bg }]}
+              >
+                <Text style={styles.eventOptionGlyph}>{meta.glyph}</Text>
+                <Text
+                  style={[styles.eventOptionLabel, { color: meta.color }]}
+                >
+                  {meta.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </>
+  );
+}
+
+function TotalBadge({
+  type,
+  value,
+}: {
+  type: MatchEventType;
+  value: number;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const meta = EVENT_META[type];
+  return (
+    <View style={[styles.totalBadge, { backgroundColor: meta.bg }]}>
+      <Text style={styles.totalBadgeGlyph}>{meta.glyph}</Text>
+      <Text style={[styles.totalBadgeValue, { color: meta.color }]}>
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -684,6 +774,46 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   muted: { ...typography.body, color: c.textMuted },
+  eventGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  eventOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    width: '48%',
+    flexGrow: 1,
+  },
+  eventOptionGlyph: { fontSize: 20 },
+  eventOptionLabel: {
+    ...typography.bodyBold,
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  totalsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  totalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+  },
+  totalBadgeGlyph: { fontSize: 11 },
+  totalBadgeValue: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
 });
 
 const makePickerStyles = (c: ThemedColors) => StyleSheet.create({
