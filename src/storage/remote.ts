@@ -502,23 +502,33 @@ export type CoachNote = {
   updatedAt: string;
 };
 
-// Postgres error helpers — used to detect when the multi-team SQL
-// migration hasn't been applied yet (legacy schema). The codes come
-// from PostgREST: 42P01 = relation does not exist, 42703 = column
-// does not exist, PGRST204 = column not found in cache.
+// Postgres / PostgREST error helpers — used to detect when the
+// multi-team SQL migration hasn't been applied yet (legacy schema).
+// Codes:
+//   42P01    = relation does not exist (Postgres)
+//   42703    = column does not exist (Postgres)
+//   PGRST204 = column not found in schema cache (PostgREST)
+//   PGRST205 = table not found in schema cache (PostgREST)
 function isMissingTable(err: any): boolean {
   if (!err) return false;
-  if (err.code === '42P01') return true;
+  if (err.code === '42P01' || err.code === 'PGRST205') return true;
   const msg = String(err.message ?? '');
-  return /relation .* does not exist|ecfc_coach_teams/i.test(msg) &&
-    /does not exist|not found/i.test(msg);
+  if (/schema cache/i.test(msg) && /table|relation/i.test(msg)) return true;
+  if (/Could not find the table/i.test(msg)) return true;
+  if (/relation .* does not exist/i.test(msg)) return true;
+  return false;
 }
 
 function isMissingColumn(err: any): boolean {
   if (!err) return false;
   if (err.code === '42703' || err.code === 'PGRST204') return true;
   const msg = String(err.message ?? '');
-  return /active_team_id/i.test(msg) && /does not exist|not found|column/i.test(msg);
+  if (/schema cache/i.test(msg) && /column/i.test(msg)) return true;
+  if (/Could not find the .* column/i.test(msg)) return true;
+  if (/active_team_id/i.test(msg) && /does not exist|not found/i.test(msg)) {
+    return true;
+  }
+  return false;
 }
 
 function teamIdFromString(name: string): string {
