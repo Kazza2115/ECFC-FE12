@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { Avatar } from '@/components/Avatar';
@@ -212,7 +213,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               <Button
                 label="Entraînement"
                 onPress={() => startTraining()}
-                icon={<Text style={styles.actionGlyphLight}>＋</Text>}
+                icon={<Feather name="plus" size={17} color={colors.onPrimary} />}
                 fullWidth
               />
             </View>

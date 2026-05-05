@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
+import { Feather } from '@expo/vector-icons';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -21,7 +22,7 @@ import { auth, type CoachNote } from '@/storage/remote';
 import { confirm } from '@/utils/confirm';
 import { pickPlayerPhoto } from '@/utils/photo';
 import { formatDate } from '@/utils/date';
-import { radius, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/AppNavigator';
@@ -331,7 +332,7 @@ export function ProfileScreen({ navigation }: Props) {
                   {savingName ? (
                     <ActivityIndicator size="small" />
                   ) : (
-                    <Text style={styles.iconBtnLabel}>✓</Text>
+                    <Feather name="check" size={18} color={colors.onPrimary} />
                   )}
                 </Pressable>
                 <Pressable
@@ -353,7 +354,7 @@ export function ProfileScreen({ navigation }: Props) {
                 hitSlop={4}
               >
                 <Text style={styles.name}>{profile?.displayName ?? '—'}</Text>
-                <Text style={styles.nameEditHint}>✎</Text>
+                <Feather name="edit-2" size={16} color={colors.primary} />
               </Pressable>
             )}
 
@@ -383,7 +384,7 @@ export function ProfileScreen({ navigation }: Props) {
                     />
                   ) : (
                     <View style={styles.teamLogoPlaceholder}>
-                      <Text style={styles.teamLogoPlaceholderGlyph}>＋</Text>
+                      <Feather name="plus" size={24} color={colors.primary} />
                     </View>
                   )}
                   <View style={styles.teamLogoBadge}>
@@ -423,7 +424,7 @@ export function ProfileScreen({ navigation }: Props) {
                   style={styles.addBtn}
                   hitSlop={6}
                 >
-                  <Text style={styles.addBtnLabel}>＋</Text>
+                  <Feather name="plus" size={18} color={colors.onPrimary} />
                 </Pressable>
               ) : null}
             </View>
@@ -511,7 +512,7 @@ export function ProfileScreen({ navigation }: Props) {
                               disabled={busy}
                               hitSlop={6}
                             >
-                              <Text style={styles.noteIconLabel}>✎</Text>
+                              <Feather name="edit-2" size={14} color={colors.primary} />
                             </Pressable>
                             <Pressable
                               onPress={() => deleteNote(n)}
@@ -522,7 +523,7 @@ export function ProfileScreen({ navigation }: Props) {
                               {busy ? (
                                 <ActivityIndicator size="small" />
                               ) : (
-                                <Text style={styles.noteDeleteLabel}>🗑</Text>
+                                <Feather name="trash-2" size={14} color={colors.danger} />
                               )}
                             </Pressable>
                           </View>

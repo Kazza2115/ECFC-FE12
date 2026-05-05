@@ -1,25 +1,38 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { Feather } from '@expo/vector-icons';
 import { BottomSheet } from './BottomSheet';
 import { useTheme, type ThemePreference } from '@/context/ThemeContext';
 import { radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 
+type FeatherName = 'sun' | 'moon' | 'monitor';
+
 const OPTIONS: {
   key: ThemePreference;
   label: string;
   hint: string;
-  glyph: string;
+  icon: FeatherName;
 }[] = [
   {
     key: 'auto',
     label: 'Automatique',
     hint: 'Suit le mode du téléphone',
-    glyph: '◐',
+    icon: 'monitor',
   },
-  { key: 'light', label: 'Clair', hint: 'Toujours en thème clair', glyph: '☀' },
-  { key: 'dark', label: 'Sombre', hint: 'Toujours en thème sombre', glyph: '☾' },
+  {
+    key: 'light',
+    label: 'Clair',
+    hint: 'Toujours en thème clair',
+    icon: 'sun',
+  },
+  {
+    key: 'dark',
+    label: 'Sombre',
+    hint: 'Toujours en thème sombre',
+    icon: 'moon',
+  },
 ];
 
 export function ThemeToggle() {
@@ -35,7 +48,7 @@ export function ThemeToggle() {
     await setPreference(next);
   };
 
-  const glyph = effective === 'dark' ? '☾' : '☀';
+  const icon: FeatherName = effective === 'dark' ? 'moon' : 'sun';
 
   return (
     <>
@@ -43,7 +56,7 @@ export function ThemeToggle() {
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
       >
-        <Text style={styles.btnGlyph}>{glyph}</Text>
+        <Feather name={icon} size={18} color={styles.colors.icon} />
       </Pressable>
       <BottomSheet
         visible={open}
@@ -59,16 +72,22 @@ export function ThemeToggle() {
                 onPress={() => handlePick(opt.key)}
                 style={[styles.option, active && styles.optionActive]}
               >
-                <Text style={[styles.optionGlyph, active && styles.optionGlyphActive]}>
-                  {opt.glyph}
-                </Text>
+                <View style={styles.optionIconWrap}>
+                  <Feather
+                    name={opt.icon}
+                    size={20}
+                    color={active ? styles.colors.activeIcon : styles.colors.icon}
+                  />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>
                     {opt.label}
                   </Text>
                   <Text style={styles.optionHint}>{opt.hint}</Text>
                 </View>
-                {active ? <Text style={styles.optionCheck}>✓</Text> : null}
+                {active ? (
+                  <Feather name="check" size={18} color={styles.colors.activeIcon} />
+                ) : null}
               </Pressable>
             );
           })}
@@ -78,8 +97,8 @@ export function ThemeToggle() {
   );
 }
 
-const makeStyles = (c: ThemedColors) =>
-  StyleSheet.create({
+const makeStyles = (c: ThemedColors) => {
+  const sheet = StyleSheet.create({
     btn: {
       width: 36,
       height: 36,
@@ -89,11 +108,6 @@ const makeStyles = (c: ThemedColors) =>
       justifyContent: 'center',
     },
     btnPressed: { opacity: 0.7 },
-    btnGlyph: {
-      fontSize: 18,
-      color: c.textPrimary,
-      fontWeight: '600',
-    },
     list: { gap: spacing.sm },
     option: {
       flexDirection: 'row',
@@ -107,13 +121,10 @@ const makeStyles = (c: ThemedColors) =>
     optionActive: {
       backgroundColor: c.primarySoft,
     },
-    optionGlyph: {
-      fontSize: 22,
+    optionIconWrap: {
       width: 28,
-      textAlign: 'center',
-      color: c.textPrimary,
+      alignItems: 'center',
     },
-    optionGlyphActive: { color: c.primary },
     optionLabel: {
       ...typography.bodyBold,
       color: c.textPrimary,
@@ -125,9 +136,12 @@ const makeStyles = (c: ThemedColors) =>
       color: c.textMuted,
       marginTop: 2,
     },
-    optionCheck: {
-      ...typography.h3,
-      color: c.primary,
-      fontWeight: '800',
-    },
   });
+  return {
+    ...sheet,
+    colors: {
+      icon: c.textPrimary,
+      activeIcon: c.primary,
+    },
+  };
+};

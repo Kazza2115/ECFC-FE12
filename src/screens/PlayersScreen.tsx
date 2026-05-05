@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -113,7 +114,7 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
         subtitle={`${players.length} dans l'effectif`}
         right={
           <Pressable style={styles.addBtn} onPress={openCreate}>
-            <Text style={styles.addBtnLabel}>＋</Text>
+            <Feather name="plus" size={20} color={colors.onPrimary} />
           </Pressable>
         }
       />
@@ -163,7 +164,7 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
                 onPress={() => openEdit(item.id, item.name)}
                 hitSlop={8}
               >
-                <Text style={styles.iconGlyph}>✎</Text>
+                <Feather name="edit-2" size={14} color={colors.primary} />
               </Pressable>
               <Pressable
                 style={styles.deleteBtn}

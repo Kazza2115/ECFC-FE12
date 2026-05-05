@@ -54,7 +54,7 @@ function Tabs() {
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} glyph="⌂" label="Accueil" />
+            <TabIcon focused={focused} name="home" label="Accueil" />
           ),
         }}
       />
@@ -63,7 +63,7 @@ function Tabs() {
         component={PlayersScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} glyph="👥" label="Joueurs" />
+            <TabIcon focused={focused} name="users" label="Joueurs" />
           ),
         }}
       />
@@ -72,7 +72,7 @@ function Tabs() {
         component={StatsScreen}
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} glyph="📊" label="Stats" />
+            <TabIcon focused={focused} name="bar-chart-2" label="Stats" />
           ),
         }}
       />

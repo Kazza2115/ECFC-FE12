@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { Avatar } from '@/components/Avatar';
 import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Card } from '@/components/Card';
@@ -16,7 +17,7 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { EVENT_META } from '@/constants/events';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
-import { radius, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
 import { useThemedStyles, type ThemedColors } from '@/theme/useThemedStyles';
 import { formatDate } from '@/utils/date';
 import { isMatchKind } from '@/types';
@@ -364,7 +365,7 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
                       ) : null}
                     </View>
                   ) : null}
-                  <Text style={styles.activityCaret}>›</Text>
+                  <Feather name="chevron-right" size={18} color={colors.textMuted} style={styles.activityCaret} />
                 </Pressable>
               ))}
             </Card>
