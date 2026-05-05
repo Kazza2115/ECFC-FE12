@@ -143,18 +143,21 @@ function AuthGate() {
 }
 
 // jsDelivr-hosted Feather TTF used as a CDN fallback in case the
-// bundled-asset URL resolution misbehaves on a particular deployment
-// (the GitHub Pages baseUrl / expo-asset combination has been
-// inconsistent on web).
+// bundled-asset URL is blocked. GitHub Pages refuses any path that
+// contains `node_modules` (returns 403), and that's exactly where
+// @expo/vector-icons would normally place the font — so we ship a
+// copy of the same TTF inside our own `assets/` directory and point
+// to that instead.
 const FEATHER_CDN_URL =
   'https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.0/Fonts/Feather.ttf';
 
 async function resolveBundledFeatherUrl(): Promise<string | null> {
   try {
-    const featherTtf = require(
-      '@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf',
-    );
-    const asset = Asset.fromModule(featherTtf);
+    // ./assets/Feather.ttf is a verbatim copy of the @expo/vector-icons
+    // Feather TTF — see commit message for why we don't load it from
+    // node_modules directly.
+    const localTtf = require('./assets/Feather.ttf');
+    const asset = Asset.fromModule(localTtf);
     await asset.downloadAsync();
     return asset.localUri || asset.uri || null;
   } catch {
