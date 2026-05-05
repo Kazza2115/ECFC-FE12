@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { BottomSheet } from '@/components/BottomSheet';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { ActionTile } from '@/components/ActionTile';
@@ -58,7 +59,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     lastSyncError,
     refreshFromCloud,
   } = useData();
-  const { profile } = useAuth();
+  const { profile, switchTeam } = useAuth();
   const styles = useThemedStyles(makeStyles);
 
   const coachFirstName = (profile?.displayName ?? '').split(' ')[0] || '';
@@ -70,6 +71,8 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
   const [matchModalOpen, setMatchModalOpen] = useState(false);
   const [opponent, setOpponent] = useState('');
   const [matchFormat, setMatchFormat] = useState<'match' | 'match_7x7'>('match');
+  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
+  const [switchingTeamId, setSwitchingTeamId] = useState<string | null>(null);
 
   const topPlayers = playerStats.slice(0, 5);
   const lastSession = sessions[0];
@@ -152,17 +155,33 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               <ThemeToggle />
               <ProfileMenu />
             </View>
-            <View style={styles.headerHero}>
+            <Pressable
+              onPress={() => {
+                if ((profile?.teams?.length ?? 0) > 1) {
+                  setTeamPickerOpen(true);
+                }
+              }}
+              style={styles.headerHero}
+            >
               <TeamLogo
                 teamId={profile?.teamId}
                 logoUrl={profile?.teamLogoUrl}
                 size={52}
               />
               <View style={styles.headerHeroText}>
-                <Text style={styles.subtitle}>{teamLabel}</Text>
+                <View style={styles.subtitleRow}>
+                  <Text style={styles.subtitle}>{teamLabel}</Text>
+                  {(profile?.teams?.length ?? 0) > 1 ? (
+                    <Feather
+                      name="chevron-down"
+                      size={14}
+                      color={colors.textMuted}
+                    />
+                  ) : null}
+                </View>
                 <Text style={styles.greeting}>{greeting}</Text>
               </View>
-            </View>
+            </Pressable>
           </View>
         </AnimatedFadeIn>
 
@@ -417,6 +436,73 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
           </Card>
         </KeyboardAvoidingView>
       </Modal>
+
+      <BottomSheet
+        visible={teamPickerOpen}
+        title="Mes équipes"
+        onClose={() => setTeamPickerOpen(false)}
+      >
+        <View style={styles.teamList}>
+          {(profile?.teams ?? []).map((team) => {
+            const isActive = team.id === profile?.teamId;
+            const isSwitching = switchingTeamId === team.id;
+            return (
+              <Pressable
+                key={team.id}
+                disabled={isSwitching}
+                onPress={async () => {
+                  if (isActive) {
+                    setTeamPickerOpen(false);
+                    return;
+                  }
+                  try {
+                    setSwitchingTeamId(team.id);
+                    await switchTeam(team.id);
+                    setTeamPickerOpen(false);
+                  } catch {
+                    await notify(
+                      'Erreur',
+                      'Impossible de changer d\'équipe pour le moment.',
+                    );
+                  } finally {
+                    setSwitchingTeamId(null);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.teamRow,
+                  isActive && styles.teamRowActive,
+                  pressed && !isActive && { opacity: 0.85 },
+                ]}
+              >
+                <TeamLogo teamId={team.id} logoUrl={team.logoUrl} size={40} />
+                <View style={styles.teamRowText}>
+                  <Text style={styles.teamRowName} numberOfLines={1}>
+                    {team.name}
+                  </Text>
+                  {isActive ? (
+                    <Text style={styles.teamRowHint}>Équipe active</Text>
+                  ) : null}
+                </View>
+                {isActive ? (
+                  <View style={styles.teamRowCheck}>
+                    <Feather
+                      name="check"
+                      size={16}
+                      color={colors.onPrimary}
+                    />
+                  </View>
+                ) : (
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -456,6 +542,11 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     flexShrink: 1,
   },
   greeting: { ...typography.largeTitle, color: c.textPrimary, marginTop: 2 },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   subtitle: {
     ...typography.micro,
     color: c.textMuted,
@@ -647,5 +738,37 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: spacing.lg,
+  },
+  teamList: { gap: spacing.sm },
+  teamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.background,
+  },
+  teamRowActive: {
+    borderColor: c.primary,
+    backgroundColor: c.primarySoft,
+  },
+  teamRowText: { flex: 1, minWidth: 0 },
+  teamRowName: { ...typography.bodyBold, color: c.textPrimary },
+  teamRowHint: {
+    ...typography.caption,
+    color: c.primary,
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  teamRowCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: c.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

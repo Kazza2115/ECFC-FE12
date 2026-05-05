@@ -23,6 +23,11 @@ type AuthContextValue = {
   // Onboarding actions (called from the OnboardingScreen).
   claimTeam: (code: string, displayName: string) => Promise<void>;
   createTeam: (teamName: string, displayName: string) => Promise<void>;
+  // Multi-team actions for an already-onboarded coach.
+  joinTeamByCode: (code: string) => Promise<void>;
+  joinTeamByName: (teamName: string) => Promise<void>;
+  switchTeam: (teamId: string) => Promise<void>;
+  leaveTeam: (teamId: string) => Promise<void>;
   // Update any subset of the coach profile fields.
   updateProfile: (patch: CoachProfilePatch) => Promise<void>;
   // Replace / clear the coach's profile photo. Pass undefined to remove.
@@ -40,6 +45,10 @@ const AuthContext = createContext<AuthContextValue>({
   signOut: async () => {},
   claimTeam: async () => {},
   createTeam: async () => {},
+  joinTeamByCode: async () => {},
+  joinTeamByName: async () => {},
+  switchTeam: async () => {},
+  leaveTeam: async () => {},
   updateProfile: async () => {},
   setCoachPhoto: async () => {},
   setTeamLogo: async () => {},
@@ -158,6 +167,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [session, refreshProfile],
   );
 
+  const joinTeamByCode = useCallback(
+    async (code: string) => {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('Pas de session active.');
+      const found = await auth.claimTeamByCode(code);
+      if (!found) {
+        throw new Error('Code invalide. Vérifie auprès de ton club.');
+      }
+      await auth.joinTeam(userId, found.teamId);
+      await auth.setActiveTeam(userId, found.teamId);
+      try {
+        await db.resetAll();
+      } catch {}
+      await refreshProfile(userId);
+    },
+    [session, refreshProfile],
+  );
+
+  const joinTeamByName = useCallback(
+    async (teamName: string) => {
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('Pas de session active.');
+      if (!teamName.trim()) throw new Error("Nom d'équipe requis.");
+      const created = await auth.createTeam(teamName, userId);
+      await auth.joinTeam(userId, created.teamId);
+      await auth.setActiveTeam(userId, created.teamId);
+      try {
+        await db.resetAll();
+      } catch {}
+      await refreshProfile(userId);
+    },
+    [session, refreshProfile],
+  );
+
+  const switchTeam = useCallback(
+    async (teamId: string) => {
+      const userId = session?.user?.id;
+      if (!userId) return;
+      if (profile && profile.teamId === teamId) return;
+      await auth.setActiveTeam(userId, teamId);
+      // Wipe the local cache so the new team's data hydrates fresh
+      // from Supabase rather than mixing with the previous team's
+      // residual entries.
+      try {
+        await db.resetAll();
+      } catch {}
+      await refreshProfile(userId);
+    },
+    [session, profile, refreshProfile],
+  );
+
+  const leaveTeam = useCallback(
+    async (teamId: string) => {
+      const userId = session?.user?.id;
+      if (!userId) return;
+      await auth.leaveTeam(userId, teamId);
+      // If we were on the team we're leaving, fall back to another
+      // membership (the refresh below picks the first one).
+      if (profile?.teamId === teamId) {
+        try {
+          await db.resetAll();
+        } catch {}
+      }
+      await refreshProfile(userId);
+    },
+    [session, profile, refreshProfile],
+  );
+
   const updateProfile = useCallback(
     async (patch: CoachProfilePatch) => {
       const userId = session?.user?.id;
@@ -215,6 +292,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       claimTeam,
       createTeam,
+      joinTeamByCode,
+      joinTeamByName,
+      switchTeam,
+      leaveTeam,
       updateProfile,
       setCoachPhoto,
       setTeamLogo,
@@ -228,6 +309,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signOut,
       claimTeam,
       createTeam,
+      joinTeamByCode,
+      joinTeamByName,
+      switchTeam,
+      leaveTeam,
       updateProfile,
       setCoachPhoto,
       setTeamLogo,

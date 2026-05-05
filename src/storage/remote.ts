@@ -468,12 +468,25 @@ export const remote = {
 // Auth + multi-tenant identity
 // ===========================================================================
 
+export type CoachTeam = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+};
+
 export type CoachProfile = {
   userId: string;
   displayName: string;
+  // Active team — what the dashboard currently displays. Same shape
+  // as a CoachTeam entry from `teams` below, lifted to the top of
+  // the profile so existing screens keep reading
+  // `profile.teamId / teamName / teamLogoUrl` unchanged.
   teamId: string;
   teamName: string;
   teamLogoUrl?: string | null;
+  // All teams the coach belongs to — used by the team picker in
+  // the profile screen and dashboard header.
+  teams: CoachTeam[];
   photoUrl?: string | null;
 };
 
@@ -536,25 +549,68 @@ export const auth = {
   async fetchProfile(userId: string): Promise<CoachProfile | null> {
     const { data: profileRow, error: profErr } = await supabase
       .from('ecfc_coach_profiles')
-      .select('user_id, display_name, team_id, photo_url')
+      .select('user_id, display_name, team_id, active_team_id, photo_url')
       .eq('user_id', userId)
       .maybeSingle();
     if (profErr) throw profErr;
     if (!profileRow) return null;
 
-    const { data: teamRow, error: teamErr } = await supabase
-      .from('ecfc_teams')
-      .select('id, name, logo_url')
-      .eq('id', profileRow.team_id)
-      .maybeSingle();
-    if (teamErr) throw teamErr;
+    // Read every membership for this coach, then resolve the team
+    // metadata (name + logo) in one go.
+    const { data: memberRows, error: memErr } = await supabase
+      .from('ecfc_coach_teams')
+      .select('team_id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (memErr) throw memErr;
+
+    const teamIds = (memberRows ?? []).map((r) => r.team_id);
+    let teams: CoachTeam[] = [];
+    if (teamIds.length > 0) {
+      const { data: teamRows, error: teamsErr } = await supabase
+        .from('ecfc_teams')
+        .select('id, name, logo_url')
+        .in('id', teamIds);
+      if (teamsErr) throw teamsErr;
+      // Preserve the membership order (oldest first).
+      const byId = new Map<
+        string,
+        { id: string; name: string; logo_url: string | null }
+      >();
+      for (const t of teamRows ?? []) byId.set(t.id, t);
+      teams = teamIds
+        .map((id) => byId.get(id))
+        .filter((t): t is { id: string; name: string; logo_url: string | null } => !!t)
+        .map((t) => ({ id: t.id, name: t.name, logoUrl: t.logo_url ?? null }));
+    }
+
+    // Resolve the active team. Priority:
+    //   1) profile.active_team_id if it points at a team the coach is
+    //      still a member of
+    //   2) the legacy profile.team_id if the coach has it
+    //   3) the first team in their membership list
+    let active: CoachTeam | undefined;
+    const activeId = profileRow.active_team_id ?? profileRow.team_id ?? null;
+    if (activeId) {
+      active = teams.find((t) => t.id === activeId);
+    }
+    if (!active && teams.length > 0) {
+      active = teams[0];
+    }
+
+    if (!active) {
+      // Coach has a profile row but no team yet — let the caller
+      // decide what to do (typically: route to the onboarding screen).
+      return null;
+    }
 
     return {
       userId: profileRow.user_id,
       displayName: profileRow.display_name,
-      teamId: profileRow.team_id,
-      teamName: teamRow?.name ?? 'Mon équipe',
-      teamLogoUrl: teamRow?.logo_url ?? null,
+      teamId: active.id,
+      teamName: active.name,
+      teamLogoUrl: active.logoUrl ?? null,
+      teams,
       photoUrl: profileRow.photo_url ?? null,
     };
   },
@@ -609,11 +665,57 @@ export const auth = {
     displayName: string,
     teamId: string,
   ): Promise<void> {
-    const { error } = await supabase.from('ecfc_coach_profiles').insert({
-      user_id: userId,
-      display_name: displayName.trim(),
-      team_id: teamId,
-    });
+    // Insert (or refresh) the profile row + the membership row + the
+    // active-team pointer in a single best-effort pass. Each step is
+    // idempotent so re-running on a coach who already has a profile
+    // is fine.
+    const { error: profErr } = await supabase
+      .from('ecfc_coach_profiles')
+      .upsert(
+        {
+          user_id: userId,
+          display_name: displayName.trim(),
+          team_id: teamId,
+          active_team_id: teamId,
+        },
+        { onConflict: 'user_id' },
+      );
+    if (profErr) throw profErr;
+    const { error: memErr } = await supabase
+      .from('ecfc_coach_teams')
+      .upsert(
+        { user_id: userId, team_id: teamId, role: 'coach' },
+        { onConflict: 'user_id,team_id' },
+      );
+    if (memErr) throw memErr;
+  },
+
+  async joinTeam(userId: string, teamId: string): Promise<void> {
+    // Idempotent insert into the membership table — used when an
+    // existing coach claims a 2nd / 3rd team.
+    const { error } = await supabase
+      .from('ecfc_coach_teams')
+      .upsert(
+        { user_id: userId, team_id: teamId, role: 'coach' },
+        { onConflict: 'user_id,team_id' },
+      );
+    if (error) throw error;
+  },
+
+  async setActiveTeam(userId: string, teamId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_coach_profiles')
+      .update({ active_team_id: teamId, updated_at: now() })
+      .eq('user_id', userId);
+    if (error) throw error;
+  },
+
+  async leaveTeam(userId: string, teamId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ecfc_coach_teams')
+      .delete()
+      .eq('user_id', userId)
+      .eq('team_id', teamId);
     if (error) throw error;
   },
 

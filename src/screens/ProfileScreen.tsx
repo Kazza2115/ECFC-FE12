@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Avatar } from '@/components/Avatar';
+import { BottomSheet } from '@/components/BottomSheet';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
@@ -38,6 +39,9 @@ export function ProfileScreen({ navigation }: Props) {
     updateProfile,
     setCoachPhoto,
     setTeamLogo,
+    switchTeam,
+    joinTeamByCode,
+    joinTeamByName,
     signOut,
   } = useAuth();
   const styles = useThemedStyles(makeStyles);
@@ -52,6 +56,19 @@ export function ProfileScreen({ navigation }: Props) {
   // Team-logo edit state
   const [logoBusy, setLogoBusy] = useState(false);
   const [teamError, setTeamError] = useState<string | null>(null);
+
+  // Add-team bottom sheet state. `null` = closed, 'pick' = the two-
+  // option chooser, 'claim' = code-input form, 'create' = name form.
+  const [teamSheet, setTeamSheet] = useState<
+    | null
+    | { mode: 'pick' }
+    | { mode: 'claim' }
+    | { mode: 'create' }
+  >(null);
+  const [teamSheetCode, setTeamSheetCode] = useState('');
+  const [teamSheetName, setTeamSheetName] = useState('');
+  const [teamSheetBusy, setTeamSheetBusy] = useState(false);
+  const [teamSheetError, setTeamSheetError] = useState<string | null>(null);
 
   // Notes state
   const [notes, setNotes] = useState<CoachNote[]>([]);
@@ -371,47 +388,107 @@ export function ProfileScreen({ navigation }: Props) {
           {/* Mes équipes -------------------------------------------- */}
           <AnimatedFadeIn delay={80}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Mes équipes</Text>
-            <Card style={styles.teamCard}>
-              <View style={styles.teamRow}>
+            <View style={styles.teamsHeader}>
+              <Text style={styles.sectionTitle}>Mes équipes</Text>
+              <Pressable
+                onPress={() => setTeamSheet({ mode: 'pick' })}
+                style={styles.addBtn}
+                hitSlop={6}
+              >
+                <Feather name="plus" size={18} color={colors.onPrimary} />
+              </Pressable>
+            </View>
+
+            {(profile?.teams ?? []).map((team) => {
+              const isActive = team.id === profile?.teamId;
+              const isCarougeTeam = team.id === 'ecfc-juniors';
+              const teamHasLogo = !!team.logoUrl || isCarougeTeam;
+              return (
                 <Pressable
-                  onPress={logoBusy ? undefined : handleTeamLogo}
-                  style={styles.teamLogoWrap}
+                  key={team.id}
+                  onPress={() => {
+                    if (isActive) return;
+                    switchTeam(team.id).catch((err: any) =>
+                      setTeamError(err?.message ?? 'Impossible de changer d\'équipe.'),
+                    );
+                  }}
+                  style={({ pressed }) => [pressed && !isActive && { opacity: 0.85 }]}
                 >
-                  {hasTeamLogo ? (
-                    <TeamLogo
-                      teamId={profile?.teamId}
-                      logoUrl={profile?.teamLogoUrl}
-                      size={56}
-                    />
-                  ) : (
-                    <View style={styles.teamLogoPlaceholder}>
-                      <Feather name="plus" size={24} color={colors.primary} />
+                  <Card
+                    style={[
+                      styles.teamCard,
+                      isActive && styles.teamCardActive,
+                    ]}
+                  >
+                    <View style={styles.teamRow}>
+                      <Pressable
+                        onPress={
+                          isActive && !logoBusy ? handleTeamLogo : undefined
+                        }
+                        style={styles.teamLogoWrap}
+                        disabled={!isActive || logoBusy}
+                      >
+                        {teamHasLogo ? (
+                          <TeamLogo
+                            teamId={team.id}
+                            logoUrl={team.logoUrl}
+                            size={48}
+                          />
+                        ) : (
+                          <View style={styles.teamLogoPlaceholder}>
+                            <Feather
+                              name="plus"
+                              size={20}
+                              color={colors.primary}
+                            />
+                          </View>
+                        )}
+                        {isActive ? (
+                          <View style={styles.teamLogoBadge}>
+                            {logoBusy ? (
+                              <ActivityIndicator size="small" />
+                            ) : (
+                              <Text style={styles.cameraGlyph}>📷</Text>
+                            )}
+                          </View>
+                        ) : null}
+                      </Pressable>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.teamName} numberOfLines={1}>
+                          {team.name}
+                        </Text>
+                        <Text style={styles.teamHint}>
+                          {isActive
+                            ? teamHasLogo
+                              ? 'Tape sur le blason pour le changer'
+                              : 'Tape pour ajouter un blason'
+                            : 'Tape pour basculer sur cette équipe'}
+                        </Text>
+                      </View>
+                      {isActive ? (
+                        <View style={styles.teamActiveBadge}>
+                          <Feather
+                            name="check"
+                            size={14}
+                            color={colors.onPrimary}
+                          />
+                        </View>
+                      ) : (
+                        <Feather
+                          name="chevron-right"
+                          size={18}
+                          color={colors.textMuted}
+                        />
+                      )}
                     </View>
-                  )}
-                  <View style={styles.teamLogoBadge}>
-                    {logoBusy ? (
-                      <ActivityIndicator size="small" />
-                    ) : (
-                      <Text style={styles.cameraGlyph}>📷</Text>
-                    )}
-                  </View>
+                  </Card>
                 </Pressable>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.teamName} numberOfLines={1}>
-                    {profile?.teamName ?? '—'}
-                  </Text>
-                  <Text style={styles.teamHint}>
-                    {hasTeamLogo
-                      ? 'Tape sur le blason pour le changer'
-                      : 'Tape pour ajouter un blason'}
-                  </Text>
-                </View>
-              </View>
-              {teamError ? (
-                <Text style={styles.error}>{teamError}</Text>
-              ) : null}
-            </Card>
+              );
+            })}
+
+            {teamError ? (
+              <Text style={styles.error}>{teamError}</Text>
+            ) : null}
           </View>
           </AnimatedFadeIn>
 
@@ -561,6 +638,152 @@ export function ProfileScreen({ navigation }: Props) {
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <BottomSheet
+        visible={!!teamSheet}
+        title={
+          teamSheet?.mode === 'claim'
+            ? "Rejoindre une équipe"
+            : teamSheet?.mode === 'create'
+            ? "Créer une équipe"
+            : 'Ajouter une équipe'
+        }
+        onClose={() => {
+          setTeamSheet(null);
+          setTeamSheetCode('');
+          setTeamSheetName('');
+          setTeamSheetError(null);
+        }}
+      >
+        {teamSheet?.mode === 'pick' ? (
+          <View style={{ gap: spacing.sm }}>
+            <Pressable
+              onPress={() => {
+                setTeamSheetError(null);
+                setTeamSheet({ mode: 'claim' });
+              }}
+              style={styles.teamChoice}
+            >
+              <Feather name="key" size={20} color={colors.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.teamChoiceTitle}>J'ai un code d'équipe</Text>
+                <Text style={styles.teamChoiceHint}>
+                  Pour rejoindre une équipe déjà existante.
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                setTeamSheetError(null);
+                setTeamSheet({ mode: 'create' });
+              }}
+              style={styles.teamChoice}
+            >
+              <Feather name="plus" size={20} color={colors.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.teamChoiceTitle}>Créer une équipe</Text>
+                <Text style={styles.teamChoiceHint}>
+                  Une nouvelle équipe vide, à toi de la peupler.
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {teamSheet?.mode === 'claim' ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={styles.label}>Code d'équipe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="ABCD-1234"
+              placeholderTextColor="#8E8E93"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              value={teamSheetCode}
+              onChangeText={setTeamSheetCode}
+              editable={!teamSheetBusy}
+            />
+            {teamSheetError ? (
+              <Text style={styles.error}>{teamSheetError}</Text>
+            ) : null}
+            <View style={{ height: spacing.sm }} />
+            <View style={styles.teamSheetActions}>
+              <Button
+                label="Annuler"
+                variant="secondary"
+                onPress={() => setTeamSheet({ mode: 'pick' })}
+              />
+              <View style={{ width: spacing.sm }} />
+              <Button
+                label={teamSheetBusy ? '…' : 'Rejoindre'}
+                onPress={async () => {
+                  if (teamSheetBusy) return;
+                  setTeamSheetError(null);
+                  setTeamSheetBusy(true);
+                  try {
+                    await joinTeamByCode(teamSheetCode);
+                    setTeamSheet(null);
+                    setTeamSheetCode('');
+                  } catch (err: any) {
+                    setTeamSheetError(
+                      err?.message ?? 'Le rattachement a échoué.',
+                    );
+                  } finally {
+                    setTeamSheetBusy(false);
+                  }
+                }}
+                disabled={teamSheetBusy}
+              />
+            </View>
+          </View>
+        ) : null}
+
+        {teamSheet?.mode === 'create' ? (
+          <View style={{ gap: spacing.sm }}>
+            <Text style={styles.label}>Nom de l'équipe</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Mon équipe FC"
+              placeholderTextColor="#8E8E93"
+              value={teamSheetName}
+              onChangeText={setTeamSheetName}
+              editable={!teamSheetBusy}
+            />
+            {teamSheetError ? (
+              <Text style={styles.error}>{teamSheetError}</Text>
+            ) : null}
+            <View style={{ height: spacing.sm }} />
+            <View style={styles.teamSheetActions}>
+              <Button
+                label="Annuler"
+                variant="secondary"
+                onPress={() => setTeamSheet({ mode: 'pick' })}
+              />
+              <View style={{ width: spacing.sm }} />
+              <Button
+                label={teamSheetBusy ? '…' : 'Créer'}
+                onPress={async () => {
+                  if (teamSheetBusy) return;
+                  setTeamSheetError(null);
+                  setTeamSheetBusy(true);
+                  try {
+                    await joinTeamByName(teamSheetName);
+                    setTeamSheet(null);
+                    setTeamSheetName('');
+                  } catch (err: any) {
+                    setTeamSheetError(
+                      err?.message ?? 'La création a échoué.',
+                    );
+                  } finally {
+                    setTeamSheetBusy(false);
+                  }
+                }}
+                disabled={teamSheetBusy}
+              />
+            </View>
+          </View>
+        ) : null}
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -660,6 +883,22 @@ const makeStyles = (c: ThemedColors) =>
       marginTop: spacing.sm,
       textAlign: 'center',
     },
+    label: {
+      ...typography.caption,
+      color: c.textSecondary,
+      textTransform: 'uppercase',
+      fontWeight: '800',
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 12,
+      ...typography.body,
+      color: c.textPrimary,
+      backgroundColor: c.background,
+    },
     section: {
       gap: spacing.sm,
     },
@@ -686,7 +925,47 @@ const makeStyles = (c: ThemedColors) =>
       fontSize: 18,
       lineHeight: 20,
     },
-    teamCard: {},
+    teamsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    teamCard: { marginBottom: spacing.sm },
+    teamCardActive: {
+      borderWidth: 1.5,
+      borderColor: c.primary,
+    },
+    teamActiveBadge: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: c.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    teamChoice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      backgroundColor: c.background,
+    },
+    teamChoiceTitle: {
+      ...typography.bodyBold,
+      color: c.textPrimary,
+    },
+    teamChoiceHint: {
+      ...typography.caption,
+      color: c.textMuted,
+      marginTop: 2,
+    },
+    teamSheetActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
     teamRow: {
       flexDirection: 'row',
       alignItems: 'center',
