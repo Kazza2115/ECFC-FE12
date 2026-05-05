@@ -37,6 +37,9 @@ jobs:
       - name: Export Expo web build
         run: npx expo export --platform web
 
+      - name: Generate PWA artifacts
+        run: node scripts/postbuild-pwa.mjs
+
       - name: Disable Jekyll processing
         run: touch dist/.nojekyll
 
