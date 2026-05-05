@@ -502,6 +502,25 @@ export type CoachNote = {
   updatedAt: string;
 };
 
+// Postgres error helpers — used to detect when the multi-team SQL
+// migration hasn't been applied yet (legacy schema). The codes come
+// from PostgREST: 42P01 = relation does not exist, 42703 = column
+// does not exist, PGRST204 = column not found in cache.
+function isMissingTable(err: any): boolean {
+  if (!err) return false;
+  if (err.code === '42P01') return true;
+  const msg = String(err.message ?? '');
+  return /relation .* does not exist|ecfc_coach_teams/i.test(msg) &&
+    /does not exist|not found/i.test(msg);
+}
+
+function isMissingColumn(err: any): boolean {
+  if (!err) return false;
+  if (err.code === '42703' || err.code === 'PGRST204') return true;
+  const msg = String(err.message ?? '');
+  return /active_team_id/i.test(msg) && /does not exist|not found|column/i.test(msg);
+}
+
 function teamIdFromString(name: string): string {
   // Slug + short random suffix so two coaches can use the same team
   // name without colliding.
@@ -547,24 +566,56 @@ export const auth = {
   },
 
   async fetchProfile(userId: string): Promise<CoachProfile | null> {
-    const { data: profileRow, error: profErr } = await supabase
-      .from('ecfc_coach_profiles')
-      .select('user_id, display_name, team_id, active_team_id, photo_url')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (profErr) throw profErr;
+    // Read the profile row. Try the modern schema first
+    // (with active_team_id) and fall back to the legacy one if the
+    // column hasn't been added yet — this lets coaches keep using
+    // the app before the multi-team SQL migration is applied.
+    let profileRow: any = null;
+    {
+      const modern = await supabase
+        .from('ecfc_coach_profiles')
+        .select('user_id, display_name, team_id, active_team_id, photo_url')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (modern.error && isMissingColumn(modern.error)) {
+        const legacy = await supabase
+          .from('ecfc_coach_profiles')
+          .select('user_id, display_name, team_id, photo_url')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (legacy.error) throw legacy.error;
+        profileRow = legacy.data
+          ? { ...legacy.data, active_team_id: null }
+          : null;
+      } else if (modern.error) {
+        throw modern.error;
+      } else {
+        profileRow = modern.data;
+      }
+    }
     if (!profileRow) return null;
 
-    // Read every membership for this coach, then resolve the team
-    // metadata (name + logo) in one go.
-    const { data: memberRows, error: memErr } = await supabase
-      .from('ecfc_coach_teams')
-      .select('team_id, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true });
-    if (memErr) throw memErr;
-
-    const teamIds = (memberRows ?? []).map((r) => r.team_id);
+    // Read every membership for this coach. If the join table doesn't
+    // exist yet (legacy schema), fall back to the single team_id
+    // stored on the profile so the coach keeps access to their team.
+    let teamIds: string[] = [];
+    {
+      const res = await supabase
+        .from('ecfc_coach_teams')
+        .select('team_id, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
+      if (res.error && isMissingTable(res.error)) {
+        teamIds = profileRow.team_id ? [profileRow.team_id] : [];
+      } else if (res.error) {
+        throw res.error;
+      } else {
+        teamIds = (res.data ?? []).map((r) => r.team_id);
+        if (teamIds.length === 0 && profileRow.team_id) {
+          teamIds = [profileRow.team_id];
+        }
+      }
+    }
     let teams: CoachTeam[] = [];
     if (teamIds.length > 0) {
       const { data: teamRows, error: teamsErr } = await supabase
@@ -665,58 +716,85 @@ export const auth = {
     displayName: string,
     teamId: string,
   ): Promise<void> {
-    // Insert (or refresh) the profile row + the membership row + the
-    // active-team pointer in a single best-effort pass. Each step is
-    // idempotent so re-running on a coach who already has a profile
-    // is fine.
-    const { error: profErr } = await supabase
+    // Try the modern schema first (profile row + membership row +
+    // active-team pointer). Each step is idempotent. If the
+    // multi-team migration hasn't been applied yet, retry without
+    // the new column / skip the join table so the legacy onboarding
+    // still works.
+    const modernPayload = {
+      user_id: userId,
+      display_name: displayName.trim(),
+      team_id: teamId,
+      active_team_id: teamId,
+    };
+    let res = await supabase
       .from('ecfc_coach_profiles')
-      .upsert(
-        {
-          user_id: userId,
-          display_name: displayName.trim(),
-          team_id: teamId,
-          active_team_id: teamId,
-        },
-        { onConflict: 'user_id' },
-      );
-    if (profErr) throw profErr;
-    const { error: memErr } = await supabase
+      .upsert(modernPayload, { onConflict: 'user_id' });
+    if (res.error && isMissingColumn(res.error)) {
+      const legacyPayload = {
+        user_id: userId,
+        display_name: displayName.trim(),
+        team_id: teamId,
+      };
+      res = await supabase
+        .from('ecfc_coach_profiles')
+        .upsert(legacyPayload, { onConflict: 'user_id' });
+    }
+    if (res.error) throw res.error;
+
+    const memRes = await supabase
       .from('ecfc_coach_teams')
       .upsert(
         { user_id: userId, team_id: teamId, role: 'coach' },
         { onConflict: 'user_id,team_id' },
       );
-    if (memErr) throw memErr;
+    if (memRes.error && !isMissingTable(memRes.error)) throw memRes.error;
   },
 
   async joinTeam(userId: string, teamId: string): Promise<void> {
     // Idempotent insert into the membership table — used when an
-    // existing coach claims a 2nd / 3rd team.
-    const { error } = await supabase
+    // existing coach claims a 2nd / 3rd team. Falls back to writing
+    // team_id on the profile if the membership table doesn't exist.
+    const res = await supabase
       .from('ecfc_coach_teams')
       .upsert(
         { user_id: userId, team_id: teamId, role: 'coach' },
         { onConflict: 'user_id,team_id' },
       );
-    if (error) throw error;
+    if (res.error && isMissingTable(res.error)) {
+      const fallback = await supabase
+        .from('ecfc_coach_profiles')
+        .update({ team_id: teamId })
+        .eq('user_id', userId);
+      if (fallback.error) throw fallback.error;
+      return;
+    }
+    if (res.error) throw res.error;
   },
 
   async setActiveTeam(userId: string, teamId: string): Promise<void> {
-    const { error } = await supabase
+    const res = await supabase
       .from('ecfc_coach_profiles')
       .update({ active_team_id: teamId, updated_at: now() })
       .eq('user_id', userId);
-    if (error) throw error;
+    if (res.error && isMissingColumn(res.error)) {
+      const fallback = await supabase
+        .from('ecfc_coach_profiles')
+        .update({ team_id: teamId, updated_at: now() })
+        .eq('user_id', userId);
+      if (fallback.error) throw fallback.error;
+      return;
+    }
+    if (res.error) throw res.error;
   },
 
   async leaveTeam(userId: string, teamId: string): Promise<void> {
-    const { error } = await supabase
+    const res = await supabase
       .from('ecfc_coach_teams')
       .delete()
       .eq('user_id', userId)
       .eq('team_id', teamId);
-    if (error) throw error;
+    if (res.error && !isMissingTable(res.error)) throw res.error;
   },
 
   async updateDisplayName(userId: string, displayName: string): Promise<void> {
