@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AppNavigator } from '@/navigation/AppNavigator';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { OnboardingScreen } from '@/screens/OnboardingScreen';
+import { DashboardSkeleton } from '@/components/DashboardSkeleton';
 import { setActiveTeamId } from '@/storage/supabase';
 import { colors } from '@/theme';
 
@@ -33,7 +34,12 @@ function MainShell() {
   };
 
   if (dataLoading) {
-    return <Loading message="Chargement de tes données…" />;
+    return (
+      <>
+        <StatusBar style={effective === 'dark' ? 'light' : 'dark'} />
+        <DashboardSkeleton />
+      </>
+    );
   }
 
   return (

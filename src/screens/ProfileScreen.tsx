@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Feather } from '@expo/vector-icons';
+import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { Skeleton } from '@/components/Skeleton';
 import { TeamLogo } from '@/components/TeamLogo';
 import { useAuth } from '@/context/AuthContext';
 import { auth, type CoachNote } from '@/storage/remote';
@@ -459,8 +460,16 @@ export function ProfileScreen({ navigation }: Props) {
             ) : null}
 
             {notesLoading ? (
-              <View style={styles.notesLoading}>
-                <ActivityIndicator />
+              <View style={{ gap: spacing.sm }}>
+                {[0, 1, 2].map((i) => (
+                  <Card key={i} style={styles.noteCard}>
+                    <Skeleton width="90%" height={14} delay={i * 90} />
+                    <View style={{ height: 8 }} />
+                    <Skeleton width="60%" height={14} delay={i * 90 + 60} />
+                    <View style={{ height: 12 }} />
+                    <Skeleton width={80} height={11} delay={i * 90 + 120} />
+                  </Card>
+                ))}
               </View>
             ) : notes.length === 0 && editingNoteId !== 'new' ? (
               <Card style={styles.emptyCard}>
