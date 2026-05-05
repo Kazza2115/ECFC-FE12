@@ -84,6 +84,11 @@ export function AppNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
+        // Soft cross-fade between screens — feels closer to a HeroUI
+        // web app than the default iOS horizontal slide. Pairs nicely
+        // with the per-section AnimatedFadeIn on every page.
+        animation: 'fade',
+        animationDuration: 220,
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { ...typography.h3, color: colors.textPrimary },
