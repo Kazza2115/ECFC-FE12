@@ -82,6 +82,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
     endMatch,
     putOnPitch,
     takeOffPitch,
+    liveMatch,
   } = useData();
   const styles = useThemedStyles(makeStyles);
 
@@ -213,6 +214,22 @@ export function MatchLiveScreen({ route, navigation }: Props) {
   const missingSlots = Math.max(0, lineupRequired - lineupFilledCount);
 
   const handleStartMatch = async () => {
+    // Refuse to start a second match while another one is still live.
+    if (liveMatch && liveMatch.id !== sessionId) {
+      const opponent = liveMatch.label
+        ? `vs ${liveMatch.label}`
+        : 'le match en cours';
+      const goToLive = await confirm({
+        title: 'Match en cours',
+        message: `Tu as déjà un match en cours ${opponent}. Termine-le avant d'en démarrer un nouveau.`,
+        confirmLabel: 'Aller au match',
+        cancelLabel: 'Annuler',
+      });
+      if (goToLive) {
+        navigation.navigate('MatchLive', { sessionId: liveMatch.id });
+      }
+      return;
+    }
     if (formation) {
       if (missingSlots > 0) {
         await notify(

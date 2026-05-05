@@ -53,6 +53,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
     activeTrainingsCount,
     activeMatchesCount,
     createSession,
+    liveMatch,
     syncStatus,
     lastSyncError,
     refreshFromCloud,
@@ -164,6 +165,38 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
             </View>
           </View>
         </AnimatedFadeIn>
+
+        {liveMatch ? (
+          <AnimatedFadeIn delay={40}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('MatchLive', { sessionId: liveMatch.id })
+              }
+              style={({ pressed }) => [
+                styles.liveBanner,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <View style={styles.liveDot} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.liveBannerLabel}>Match en cours</Text>
+                <Text style={styles.liveBannerTitle} numberOfLines={1}>
+                  {liveMatch.label
+                    ? `vs ${liveMatch.label}`
+                    : 'Match'}
+                </Text>
+              </View>
+              <View style={styles.liveBannerCta}>
+                <Text style={styles.liveBannerCtaLabel}>Reprendre</Text>
+                <Feather
+                  name="chevron-right"
+                  size={18}
+                  color={colors.onPrimary}
+                />
+              </View>
+            </Pressable>
+          </AnimatedFadeIn>
+        ) : null}
 
         <AnimatedFadeIn delay={70}>
         <Card style={styles.heroCard}>
@@ -437,6 +470,47 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: spacing.xs,
     overflow: 'hidden',
+  },
+  liveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    backgroundColor: c.primary,
+    shadowColor: c.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.32,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  liveDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.success,
+  },
+  liveBannerLabel: {
+    ...typography.micro,
+    color: 'rgba(255, 255, 255, 0.85)',
+    textTransform: 'uppercase',
+  },
+  liveBannerTitle: {
+    ...typography.bodyBold,
+    color: c.onPrimary,
+    marginTop: 2,
+  },
+  liveBannerCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  liveBannerCtaLabel: {
+    ...typography.bodyBold,
+    color: c.onPrimary,
   },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg },
   heroText: { flex: 1 },

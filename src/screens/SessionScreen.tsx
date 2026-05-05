@@ -44,6 +44,7 @@ export function SessionScreen({ route, navigation }: Props) {
     deleteSession,
     toggleCancelled,
     setSessionConfirmed,
+    liveMatch,
   } = useData();
   const styles = useThemedStyles(makeStyles);
 
@@ -103,6 +104,23 @@ export function SessionScreen({ route, navigation }: Props) {
   const matchFormatLabel = session?.kind === 'match_7x7' ? '7 vs 7' : '11 vs 11';
 
   const handleModeLive = async () => {
+    // Refuse to start a second match while another one is still
+    // running. Offer to jump back to the live one instead.
+    if (liveMatch && liveMatch.id !== sessionId) {
+      const opponent = liveMatch.label
+        ? `vs ${liveMatch.label}`
+        : 'le match en cours';
+      const goToLive = await confirm({
+        title: 'Match en cours',
+        message: `Tu as déjà un match en cours ${opponent}. Termine-le avant d'en démarrer un nouveau.`,
+        confirmLabel: 'Aller au match',
+        cancelLabel: 'Annuler',
+      });
+      if (goToLive) {
+        navigation.navigate('MatchLive', { sessionId: liveMatch.id });
+      }
+      return;
+    }
     if (presentCount < requiredConvoqués) {
       await notify(
         'Pas assez de convoqués',

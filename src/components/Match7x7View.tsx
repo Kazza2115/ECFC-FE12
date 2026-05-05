@@ -51,6 +51,7 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
     endMatch,
     getPlayerPlayMs,
     applyTeamToQuarter,
+    liveMatch,
   } = useData();
   const styles = useThemedStyles(makeStyles);
 
@@ -120,6 +121,28 @@ export function Match7x7View({ session, sessionId, convoqués }: Props) {
   };
 
   const handleStartQuarter = async () => {
+    // The first quarter is what flips this session into "live" — refuse
+    // if another match is already running. Subsequent quarters belong
+    // to the same match, so this guard skips them.
+    if (
+      !session.startedAt &&
+      liveMatch &&
+      liveMatch.id !== sessionId
+    ) {
+      const opponent = liveMatch.label
+        ? `vs ${liveMatch.label}`
+        : 'le match en cours';
+      const goToLive = await confirm({
+        title: 'Match en cours',
+        message: `Tu as déjà un match en cours ${opponent}. Termine-le avant d'en démarrer un nouveau.`,
+        confirmLabel: 'Aller au match',
+        cancelLabel: 'Annuler',
+      });
+      if (goToLive) {
+        navigation.navigate('MatchLive', { sessionId: liveMatch.id });
+      }
+      return;
+    }
     const team = quarterTeams[String(selectedQuarter)] ?? {};
     const required = formation?.slots.length ?? 7;
     const filled = Object.keys(team).length;

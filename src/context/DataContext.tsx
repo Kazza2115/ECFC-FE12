@@ -94,6 +94,10 @@ type DataContextValue = {
   globalPresentRatio: number;
   activeTrainingsCount: number;
   activeMatchesCount: number;
+  // The match currently in progress (started, not ended, not
+  // cancelled), or null if none. There can only ever be one — the
+  // app refuses to start a second one while this is set.
+  liveMatch: Session | null;
   syncStatus: SyncStatus;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
@@ -1494,6 +1498,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       .sort((a, b) => b.called - a.called);
   }, [players, activeMatches, activeMatchIds, attendances]);
 
+  // Match currently running. Used by the Dashboard to surface a
+  // resume banner and by the guards that refuse starting a 2nd
+  // match while this one is still open.
+  const liveMatch = useMemo<Session | null>(() => {
+    return (
+      sessions.find(
+        (s) =>
+          isMatchKind(s.kind) &&
+          !!s.startedAt &&
+          !s.endedAt &&
+          !s.cancelled,
+      ) ?? null
+    );
+  }, [sessions]);
+
   // "Actif" = Présent au club + SFC + Retour au club
   const globalRatio = useMemo(() => {
     if (activeTrainings.length === 0 || players.length === 0) return 0;
@@ -1711,6 +1730,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     matchCallUps,
     globalRatio,
     globalPresentRatio,
+    liveMatch,
     activeTrainingsCount: activeTrainings.length,
     activeMatchesCount: activeMatches.length,
     syncStatus,
