@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigatorScreenParams } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DashboardScreen } from '@/screens/DashboardScreen';
 import { MatchLiveScreen } from '@/screens/MatchLiveScreen';
 import { MatchSheetScreen } from '@/screens/MatchSheetScreen';
@@ -34,6 +35,14 @@ const Tab = createBottomTabNavigator<TabParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function Tabs() {
+  // Add the device's bottom safe-area inset on top of the visual tab
+  // bar height so the icons clear the iOS home indicator on phones,
+  // and don't waste space on iPads / browsers without one.
+  const insets = useSafeAreaInsets();
+  const VISIBLE_HEIGHT = 60;
+  const TOP_PADDING = 10;
+  const BOTTOM_PADDING = Math.max(insets.bottom, 8);
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -42,9 +51,9 @@ function Tabs() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: 0.5,
-          height: 84,
-          paddingBottom: 18,
-          paddingTop: 10,
+          height: VISIBLE_HEIGHT + TOP_PADDING + BOTTOM_PADDING,
+          paddingTop: TOP_PADDING,
+          paddingBottom: BOTTOM_PADDING,
         },
         tabBarShowLabel: false,
       }}

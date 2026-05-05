@@ -32,6 +32,31 @@ if (Platform.OS === 'web' && typeof console !== 'undefined') {
     originalWarn(...args);
   };
 }
+
+// On iOS PWA in standalone mode the on-screen keyboard slides up
+// without firing a window.resize, so any RN <KeyboardAvoidingView>
+// stays put and the keyboard can cover the input the user just
+// tapped. We listen for focusin on the document and, once the
+// keyboard has had a moment to appear, scroll the focused input
+// into the centre of the visual viewport — which works inside a
+// scrollable parent (our ScrollView / FlatList) without breaking
+// the rest of the app.
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const handler = (event: Event) => {
+    const el = event.target as HTMLElement | null;
+    if (!el) return;
+    const tag = (el.tagName || '').toLowerCase();
+    if (tag !== 'input' && tag !== 'textarea') return;
+    window.setTimeout(() => {
+      try {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        el.scrollIntoView();
+      }
+    }, 280);
+  };
+  document.addEventListener('focusin', handler, true);
+}
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';

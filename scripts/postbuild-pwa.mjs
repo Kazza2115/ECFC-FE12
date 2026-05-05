@@ -193,6 +193,15 @@ html = html.replace(
   '<title>Coach Hub</title>',
 );
 
+// Force `viewport-fit=cover` on the viewport meta tag — without it,
+// iOS Safari refuses to expose safe-area-inset-* values to the
+// page when running in PWA standalone mode, and the bottom tab bar
+// gets clipped by the home indicator.
+html = html.replace(
+  /<meta\s+name="viewport"[^>]*>/,
+  '<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />',
+);
+
 if (!html.includes('manifest.webmanifest')) {
   html = html.replace('</head>', `${headInjections}  </head>`);
 }
