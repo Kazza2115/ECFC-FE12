@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
+import { ActionTile } from '@/components/ActionTile';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -209,26 +210,24 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         <AnimatedFadeIn delay={210}>
         <View style={styles.actions}>
           <View style={styles.actionsRow}>
-            <View style={styles.actionCol}>
-              <Button
-                label="Entraînement"
-                onPress={() => startTraining()}
-                icon={<Feather name="plus" size={17} color={colors.onPrimary} />}
-                fullWidth
-              />
-            </View>
-            <View style={{ width: spacing.sm }} />
-            <View style={styles.actionCol}>
-              <Button
-                label="Match"
-                onPress={openMatchModal}
-                variant="secondary"
-                icon={<Text style={styles.actionGlyph}>⚽</Text>}
-                fullWidth
-              />
-            </View>
+            <ActionTile
+              variant="primary"
+              icon="plus"
+              title="Nouvel entraînement"
+              subtitle="Marquer les présences"
+              onPress={() => startTraining()}
+            />
+            <View style={{ width: spacing.md }} />
+            <ActionTile
+              variant="secondary"
+              icon="flag"
+              iconText="⚽"
+              title="Nouveau match"
+              subtitle="Convoquer ton effectif"
+              onPress={openMatchModal}
+            />
           </View>
-          <View style={{ height: spacing.xs }} />
+          <View style={{ height: spacing.sm }} />
           <Button
             label="Toutes les séances"
             onPress={() => navigation.navigate('Sessions')}
@@ -445,9 +444,6 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
   },
   actions: { paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   actionsRow: { flexDirection: 'row', gap: spacing.sm },
-  actionCol: { flex: 1 },
-  actionGlyphLight: { color: c.onPrimary, fontSize: 17, fontWeight: '800' },
-  actionGlyph: { color: c.primary, fontSize: 17 },
   upcomingBlock: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.xl,
