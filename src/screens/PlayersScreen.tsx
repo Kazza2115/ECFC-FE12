@@ -13,6 +13,7 @@ import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { PressableCard } from '@/components/PressableCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useData } from '@/context/DataContext';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -135,44 +136,43 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
           contentContainerStyle={styles.list}
           ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
           renderItem={({ item }) => (
-            <Pressable
+            <PressableCard
+              padded={false}
               onPress={() =>
                 navigation.navigate('PlayerDetail', { playerId: item.id })
               }
-              style={({ pressed }) => [pressed && styles.rowPressed]}
+              style={styles.row}
             >
-              <Card padded={false} style={styles.row}>
-                <Pressable
-                  onPress={() => handlePhoto(item.id, !!item.photoUri)}
-                  style={styles.avatarWrap}
-                >
-                  <Avatar name={item.name} photoUri={item.photoUri} size={48} />
-                  <View style={styles.cameraBadge}>
-                    <Text style={styles.cameraGlyph}>
-                      {busyId === item.id ? '…' : '📷'}
-                    </Text>
-                  </View>
-                </Pressable>
-                <View style={styles.rowText}>
-                  <Text style={styles.rowName}>{item.name}</Text>
-                  <Text style={styles.rowHint}>Voir les statistiques ›</Text>
+              <Pressable
+                onPress={() => handlePhoto(item.id, !!item.photoUri)}
+                style={styles.avatarWrap}
+              >
+                <Avatar name={item.name} photoUri={item.photoUri} size={48} />
+                <View style={styles.cameraBadge}>
+                  <Text style={styles.cameraGlyph}>
+                    {busyId === item.id ? '…' : '📷'}
+                  </Text>
                 </View>
-                <Pressable
-                  style={styles.iconBtn}
-                  onPress={() => openEdit(item.id, item.name)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.iconGlyph}>✎</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.deleteBtn}
-                  onPress={() => confirmDelete(item.id, item.name)}
-                  hitSlop={8}
-                >
-                  <Text style={styles.deleteBtnLabel}>Suppr.</Text>
-                </Pressable>
-              </Card>
-            </Pressable>
+              </Pressable>
+              <View style={styles.rowText}>
+                <Text style={styles.rowName}>{item.name}</Text>
+                <Text style={styles.rowHint}>Voir les statistiques ›</Text>
+              </View>
+              <Pressable
+                style={styles.iconBtn}
+                onPress={() => openEdit(item.id, item.name)}
+                hitSlop={8}
+              >
+                <Text style={styles.iconGlyph}>✎</Text>
+              </Pressable>
+              <Pressable
+                style={styles.deleteBtn}
+                onPress={() => confirmDelete(item.id, item.name)}
+                hitSlop={8}
+              >
+                <Text style={styles.deleteBtnLabel}>Suppr.</Text>
+              </Pressable>
+            </PressableCard>
           )}
         />
       )}

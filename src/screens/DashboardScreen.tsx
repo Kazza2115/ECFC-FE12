@@ -3,6 +3,7 @@ import { isMatchKind } from '@/types';
 import {
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -126,6 +127,14 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={syncStatus === 'syncing'}
+            onRefresh={refreshFromCloud}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <AnimatedFadeIn delay={0}>
           <View style={styles.header}>

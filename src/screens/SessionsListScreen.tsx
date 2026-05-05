@@ -10,9 +10,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AnimatedChip } from '@/components/AnimatedChip';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { PressableCard } from '@/components/PressableCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { STATUS_META } from '@/constants/statuses';
 import { useData } from '@/context/DataContext';
@@ -75,24 +77,19 @@ export function SessionsListScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.filterRow}>
           {(['all', 'training', 'match'] as Filter[]).map((f) => (
-            <Pressable
+            <AnimatedChip
               key={f}
-              onPress={() => setFilter(f)}
-              style={[styles.filterChip, filter === f && styles.filterChipActive]}
-            >
-              <Text
-                style={[
-                  styles.filterLabel,
-                  filter === f && styles.filterLabelActive,
-                ]}
-              >
-                {f === 'all'
+              label={
+                f === 'all'
                   ? 'Tout'
                   : f === 'training'
                   ? 'Entraînements'
-                  : 'Matchs'}
-              </Text>
-            </Pressable>
+                  : 'Matchs'
+              }
+              active={filter === f}
+              onPress={() => setFilter(f)}
+              fullWidth
+            />
           ))}
         </View>
 
@@ -134,15 +131,13 @@ export function SessionsListScreen({ navigation }: Props) {
             const ratio =
               players.length === 0 ? 0 : presentOrCalled / players.length;
             return (
-              <Pressable
+              <PressableCard
                 key={s.id}
                 onPress={() =>
                   navigation.navigate('Session', { sessionId: s.id })
                 }
+                style={[styles.row, s.cancelled && styles.rowCancelled]}
               >
-                <Card
-                  style={[styles.row, s.cancelled && styles.rowCancelled]}
-                >
                   <View style={styles.rowHeader}>
                     <View style={styles.rowTitleBlock}>
                       <View
@@ -212,8 +207,7 @@ export function SessionsListScreen({ navigation }: Props) {
                       <ProgressBar value={ratio} height={6} />
                     </View>
                   ) : null}
-                </Card>
-              </Pressable>
+              </PressableCard>
             );
           })
         )}

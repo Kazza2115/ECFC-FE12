@@ -11,9 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { AnimatedChip } from '@/components/AnimatedChip';
 import { Avatar } from '@/components/Avatar';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
+import { PressableCard } from '@/components/PressableCard';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ProgressRing } from '@/components/ProgressRing';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -130,15 +132,17 @@ export function StatsScreen() {
       />
 
       <View style={styles.tabsRow}>
-        <TabButton
+        <AnimatedChip
           label="🏋️  Entraînements"
           active={tab === 'training'}
           onPress={() => setTab('training')}
+          fullWidth
         />
-        <TabButton
+        <AnimatedChip
           label="⚽  Matchs"
           active={tab === 'match'}
           onPress={() => setTab('match')}
+          fullWidth
         />
       </View>
 
@@ -184,28 +188,6 @@ export function StatsScreen() {
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function TabButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  const styles = useThemedStyles(makeStyles);
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.tab, active && styles.tabActive]}
-    >
-      <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -569,13 +551,13 @@ function MatchView({
           const hasContent =
             bucket.totalEvents > 0 || bucket.totalMinutes > 0;
           return (
-            <Pressable
+            <PressableCard
               key={s.id}
               onPress={() =>
                 navigation.navigate('MatchSheet', { sessionId: s.id })
               }
+              style={styles.matchCard}
             >
-              <Card style={styles.matchCard}>
                 <View style={styles.matchCardHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.matchCardTitle} numberOfLines={1}>
@@ -658,8 +640,7 @@ function MatchView({
                 )}
 
                 <Text style={styles.matchCta}>Voir la feuille ›</Text>
-              </Card>
-            </Pressable>
+            </PressableCard>
           );
         })}
       </View>
