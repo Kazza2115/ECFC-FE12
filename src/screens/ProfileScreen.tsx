@@ -407,8 +407,8 @@ export function ProfileScreen({ navigation }: Props) {
               const activeTeam = teams.find((t) => t.id === profile?.teamId);
               const isCarougeTeam = activeTeam?.id === 'ecfc-juniors';
               const teamHasLogo = !!activeTeam?.logoUrl || isCarougeTeam;
-              const hasMultiple = teams.length > 1;
               if (!activeTeam) return null;
+              const teamCount = teams.length;
               return (
                 <Card style={[styles.teamCard, styles.teamCardActive]}>
                   <View style={styles.teamRow}>
@@ -441,34 +441,27 @@ export function ProfileScreen({ navigation }: Props) {
                       </View>
                     </Pressable>
                     <Pressable
-                      onPress={() => {
-                        if (hasMultiple) setTeamSwitcherOpen(true);
-                      }}
+                      onPress={() => setTeamSwitcherOpen(true)}
                       style={({ pressed }) => [
                         styles.teamSelect,
-                        pressed && hasMultiple && { opacity: 0.85 },
+                        pressed && { opacity: 0.85 },
                       ]}
-                      disabled={!hasMultiple}
                     >
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.teamName} numberOfLines={1}>
                           {activeTeam.name}
                         </Text>
                         <Text style={styles.teamHint}>
-                          {hasMultiple
-                            ? `Tape pour changer d'équipe (${teams.length})`
-                            : teamHasLogo
-                              ? 'Tape sur le blason pour le changer'
-                              : 'Tape sur le blason pour en ajouter un'}
+                          {teamCount > 1
+                            ? `Tape pour changer d'équipe (${teamCount})`
+                            : 'Tape pour gérer tes équipes'}
                         </Text>
                       </View>
-                      {hasMultiple ? (
-                        <Feather
-                          name="chevron-down"
-                          size={18}
-                          color={colors.textMuted}
-                        />
-                      ) : null}
+                      <Feather
+                        name="chevron-down"
+                        size={18}
+                        color={colors.textMuted}
+                      />
                     </Pressable>
                   </View>
                 </Card>
@@ -846,6 +839,35 @@ export function ProfileScreen({ navigation }: Props) {
               </Pressable>
             );
           })}
+
+          <Pressable
+            onPress={() => {
+              setTeamSwitcherOpen(false);
+              setTeamSheet({ mode: 'pick' });
+            }}
+            style={({ pressed }) => [
+              styles.teamPickRow,
+              styles.teamPickAddRow,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <View style={styles.teamPickAddIcon}>
+              <Feather name="plus" size={20} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.teamName} numberOfLines={1}>
+                Ajouter une équipe
+              </Text>
+              <Text style={styles.teamHint}>
+                Code de club ou nouvelle équipe
+              </Text>
+            </View>
+            <Feather
+              name="chevron-right"
+              size={18}
+              color={colors.textMuted}
+            />
+          </Pressable>
         </View>
       </BottomSheet>
     </SafeAreaView>
@@ -1100,6 +1122,17 @@ const makeStyles = (c: ThemedColors) =>
       color: c.primary,
       marginTop: 2,
       fontWeight: '700',
+    },
+    teamPickAddRow: {
+      borderStyle: 'dashed',
+    },
+    teamPickAddIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: c.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     notesLoading: {
       paddingVertical: spacing.lg,
