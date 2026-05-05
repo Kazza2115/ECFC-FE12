@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -185,7 +187,10 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
         animationType="fade"
         onRequestClose={() => setModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
           <Card style={styles.modalCard}>
             <Text style={styles.modalTitle}>
               {editingId ? 'Renommer le joueur' : 'Nouveau joueur'}
@@ -213,7 +218,7 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
               />
             </View>
           </Card>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -292,8 +297,10 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.overlay,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    justifyContent: 'flex-start',
+    paddingTop: 80,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   modalCard: { width: '100%', maxWidth: 420 },
   modalTitle: {

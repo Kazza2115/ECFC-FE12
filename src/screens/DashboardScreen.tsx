@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { isMatchKind } from '@/types';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -310,7 +312,10 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         animationType="fade"
         onRequestClose={() => setMatchModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
           <Card style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nouveau match</Text>
             <Text style={styles.modalHint}>
@@ -377,7 +382,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
               <Button label="Créer le match" onPress={startMatch} />
             </View>
           </Card>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -507,8 +512,12 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.overlay,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    // Top-aligned with a comfortable offset so the dialog stays
+    // visible above the iOS keyboard when the user starts typing.
+    justifyContent: 'flex-start',
+    paddingTop: 80,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   modalCard: { width: '100%', maxWidth: 420 },
   modalTitle: { ...typography.h3, color: c.textPrimary },

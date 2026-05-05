@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { isMatchKind } from '@/types';
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -220,7 +222,10 @@ export function SessionsListScreen({ navigation }: Props) {
         animationType="fade"
         onRequestClose={() => setMatchModalOpen(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
           <Card style={styles.modalCard}>
             <Text style={styles.modalTitle}>Nouveau match</Text>
             <TextInput
@@ -284,7 +289,7 @@ export function SessionsListScreen({ navigation }: Props) {
               <Button label="Créer" onPress={startMatch} />
             </View>
           </Card>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -379,8 +384,10 @@ const makeStyles = (c: ThemedColors) => StyleSheet.create({
     flex: 1,
     backgroundColor: c.overlay,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.lg,
+    justifyContent: 'flex-start',
+    paddingTop: 80,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   modalCard: { width: '100%', maxWidth: 420 },
   modalTitle: { ...typography.h3, color: c.textPrimary, marginBottom: spacing.md },
