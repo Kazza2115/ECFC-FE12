@@ -36,6 +36,9 @@ export function ActionTile({
 
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  // Hover lift — only ever animated by Pressable's onHoverIn / onHoverOut
+  // which are no-ops on native, so the spring stays at rest there.
+  const lift = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
     Animated.parallel([
@@ -69,19 +72,46 @@ export function ActionTile({
       }),
     ]).start();
   };
+  const handleHoverIn = () => {
+    Animated.timing(lift, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const handleHoverOut = () => {
+    Animated.timing(lift, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      onHoverIn={handleHoverIn}
+      onHoverOut={handleHoverOut}
       style={styles.full}
     >
       <Animated.View
         style={[
           styles.tile,
           v.tile,
-          { transform: [{ scale }], opacity },
+          {
+            transform: [
+              {
+                translateY: lift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -3],
+                }),
+              },
+              { scale },
+            ],
+            opacity,
+          },
         ]}
       >
         <GradientBackdrop

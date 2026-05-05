@@ -27,6 +27,7 @@ export function PressableCard({
 
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const lift = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
     Animated.parallel([
@@ -60,12 +61,28 @@ export function PressableCard({
       }),
     ]).start();
   };
+  const handleHoverIn = () => {
+    Animated.timing(lift, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const handleHoverOut = () => {
+    Animated.timing(lift, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      onHoverIn={handleHoverIn}
+      onHoverOut={handleHoverOut}
       disabled={disabled}
     >
       <Animated.View
@@ -73,7 +90,18 @@ export function PressableCard({
           styles.card,
           padded && styles.padded,
           disabled && styles.disabled,
-          { transform: [{ scale }], opacity },
+          {
+            transform: [
+              {
+                translateY: lift.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -2],
+                }),
+              },
+              { scale },
+            ],
+            opacity,
+          },
           style,
         ]}
         {...rest}

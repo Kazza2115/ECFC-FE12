@@ -28,6 +28,7 @@ export function Button({
   // Spring-driven press feedback for that HeroUI "tactile" feel.
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(1)).current;
+  const hover = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = () => {
     Animated.parallel([
@@ -61,12 +62,28 @@ export function Button({
       }),
     ]).start();
   };
+  const handleHoverIn = () => {
+    Animated.timing(hover, {
+      toValue: 1,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  };
+  const handleHoverOut = () => {
+    Animated.timing(hover, {
+      toValue: 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
     <Pressable
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
+      onHoverIn={handleHoverIn}
+      onHoverOut={handleHoverOut}
       disabled={disabled}
       style={fullWidth ? styles.fullWidth : undefined}
     >
@@ -76,7 +93,26 @@ export function Button({
           variantStyles.container,
           fullWidth && styles.fullWidth,
           disabled && styles.disabled,
-          { transform: [{ scale }], opacity },
+          {
+            transform: [
+              {
+                translateY: hover.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -1],
+                }),
+              },
+              {
+                scale: Animated.multiply(
+                  scale,
+                  hover.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.015],
+                  }),
+                ),
+              },
+            ],
+            opacity,
+          },
         ]}
       >
         {icon ? <View style={styles.icon}>{icon}</View> : null}
