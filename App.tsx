@@ -15,8 +15,8 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
-import { Asset } from 'expo-asset';
 import { Feather } from '@expo/vector-icons';
+import { FEATHER_FONT_DATA_URI } from '@/assets/featherFontBase64';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -142,51 +142,22 @@ function AuthGate() {
   );
 }
 
-// jsDelivr-hosted Feather TTF used as a CDN fallback in case the
-// bundled-asset URL is blocked. GitHub Pages refuses any path that
-// contains `node_modules` (returns 403), and that's exactly where
-// @expo/vector-icons would normally place the font — so we ship a
-// copy of the same TTF inside our own `assets/` directory and point
-// to that instead.
-const FEATHER_CDN_URL =
-  'https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.0/Fonts/Feather.ttf';
-
-async function resolveBundledFeatherUrl(): Promise<string | null> {
-  try {
-    // ./assets/Feather.ttf is a verbatim copy of the @expo/vector-icons
-    // Feather TTF — see commit message for why we don't load it from
-    // node_modules directly.
-    const localTtf = require('./assets/Feather.ttf');
-    const asset = Asset.fromModule(localTtf);
-    await asset.downloadAsync();
-    return asset.localUri || asset.uri || null;
-  } catch {
-    return null;
-  }
-}
-
-// Make sure the browser knows about Feather by (1) injecting a CSS
-// @font-face rule with both bundled and CDN URLs (the browser will
-// gracefully fall back to the CDN if the bundled URL 404s), and
-// (2) explicitly loading via the FontFace API so document.fonts is
-// populated before icons render.
+// Make the browser know about Feather by registering a `@font-face`
+// rule whose `src` is the TTF embedded as a base64 data URI inside
+// the JS bundle. No network request, no path / CORS / GH-Pages 403
+// to fight with. The data URI is ~75 KB inside the JS chunk, fully
+// cached after the first load.
 async function ensureFeatherFontWeb(): Promise<void> {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
   if ((globalThis as any).__ecfcFeatherFontReady) return;
 
-  const bundledUrl = await resolveBundledFeatherUrl();
-  const sources = [bundledUrl, FEATHER_CDN_URL]
-    .filter((u): u is string => !!u)
-    .map((u) => `url('${u}') format('truetype')`)
-    .join(', ');
-
-  if (!sources) return;
+  const src = `url('${FEATHER_FONT_DATA_URI}') format('truetype')`;
 
   if (!document.getElementById('__ecfc_feather_font__')) {
     const styleEl = document.createElement('style');
     styleEl.id = '__ecfc_feather_font__';
     styleEl.textContent =
-      `@font-face { font-family: 'Feather'; src: ${sources}; ` +
+      `@font-face { font-family: 'Feather'; src: ${src}; ` +
       `font-display: block; }`;
     document.head.appendChild(styleEl);
   }
@@ -195,7 +166,7 @@ async function ensureFeatherFontWeb(): Promise<void> {
   const fonts = (document as any).fonts;
   if (FF && fonts && typeof fonts.add === 'function') {
     try {
-      const face = new FF('Feather', sources);
+      const face = new FF('Feather', src);
       await face.load();
       fonts.add(face);
     } catch {
