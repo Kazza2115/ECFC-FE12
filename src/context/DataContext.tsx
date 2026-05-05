@@ -486,8 +486,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     };
     const next = [session, ...sessions];
     setSessions(next);
-    await db.saveSessions(next);
-    await pushSafe('upsertSession', () => remote.upsertSession(session));
+    // Persist locally + sync to Supabase in the background so the
+    // caller can navigate immediately. The session lives in React
+    // state already, so the destination screen renders instantly.
+    db.saveSessions(next).catch((e) => warn('saveSessions', e));
+    void pushSafe('upsertSession', () => remote.upsertSession(session));
     return session;
   }, [sessions]);
 

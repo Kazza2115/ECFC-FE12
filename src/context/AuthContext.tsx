@@ -56,6 +56,10 @@ const AuthContext = createContext<AuthContextValue>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
+  // Tracks an in-flight profile fetch. AuthGate uses it to show the
+  // splash instead of briefly rendering OnboardingScreen during the
+  // ~300ms gap between session-arrival and profile-resolution.
+  const [profileLoading, setProfileLoading] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<CoachProfile | null>(null);
   const lastUserIdRef = useRef<string | null>(null);
@@ -68,11 +72,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [profile]);
 
   const refreshProfile = useCallback(async (userId: string) => {
+    setProfileLoading(true);
     try {
       const next = await auth.fetchProfile(userId);
       setProfile(next);
     } catch {
       setProfile(null);
+    } finally {
+      setProfileLoading(false);
     }
   }, []);
 
@@ -284,7 +291,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      loading,
+      // Fold profile-fetch into the top-level loading flag so AuthGate
+      // doesn't render OnboardingScreen between session-arrival and
+      // profile-resolution.
+      loading: loading || profileLoading,
       session,
       profile,
       signIn,
@@ -302,6 +312,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       loading,
+      profileLoading,
       session,
       profile,
       signIn,
