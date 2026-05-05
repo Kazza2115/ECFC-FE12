@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
@@ -8,6 +15,7 @@ import {
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
+import { Asset } from 'expo-asset';
 import { Feather } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
@@ -134,18 +142,48 @@ function AuthGate() {
   );
 }
 
+// Resolve the bundled Feather TTF asset and inject a `@font-face`
+// rule into the document head so the browser can render the Feather
+// glyphs. Belt-and-braces in addition to expo-font, which has been
+// flaky on the GitHub Pages deployment.
+async function injectFeatherFontFaceWeb(): Promise<void> {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById('__ecfc_feather_font__')) return;
+  try {
+    const featherTtf = require(
+      '@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf',
+    );
+    const asset = Asset.fromModule(featherTtf);
+    await asset.downloadAsync();
+    const url = asset.localUri || asset.uri;
+    if (!url) return;
+    const styleEl = document.createElement('style');
+    styleEl.id = '__ecfc_feather_font__';
+    styleEl.textContent =
+      `@font-face { font-family: 'Feather'; ` +
+      `src: url('${url}') format('truetype'); ` +
+      `font-display: block; }`;
+    document.head.appendChild(styleEl);
+  } catch {
+    // Swallow — expo-font's loadAsync still has a chance to succeed.
+  }
+}
+
 export default function App() {
   // Preload @expo/vector-icons fonts so Feather glyphs render the
   // first time they appear (otherwise web shows empty boxes until the
-  // font streams in).
+  // font streams in). On web we *also* inject the @font-face CSS rule
+  // directly because expo-font has been silently failing on GitHub
+  // Pages — having both gives us a reliable fallback.
   const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    Font.loadAsync(Feather.font)
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setFontsReady(true);
-      });
+    Promise.allSettled([
+      Font.loadAsync(Feather.font),
+      injectFeatherFontFaceWeb(),
+    ]).finally(() => {
+      if (!cancelled) setFontsReady(true);
+    });
     return () => {
       cancelled = true;
     };
