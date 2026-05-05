@@ -57,20 +57,24 @@ fs.writeFileSync(
 console.log('✓ wrote dist/manifest.webmanifest');
 
 // ---- 2. PWA icons ---------------------------------------------------
-// We don't have a build-time image processor; reuse the logo PNG that
-// ships with the app. Both icon sizes point to the same source — the
-// browser scales it down for the 192 case, while iOS / Android use
-// the 512 for the high-res home-screen icon.
-const logoSrc = path.resolve('assets', 'logo.png');
-if (fs.existsSync(logoSrc)) {
-  fs.copyFileSync(logoSrc, path.join(DIST, 'icon-192.png'));
-  fs.copyFileSync(logoSrc, path.join(DIST, 'icon-512.png'));
-  console.log('✓ copied logo.png to dist/icon-{192,512}.png');
-} else {
-  console.warn(
-    '⚠ assets/logo.png missing — PWA icons will fall back to favicon.',
-  );
+// Generic Coach Hub icons live alongside the rest of the project's
+// assets. They are pre-rasterized from assets/app-icon.svg (the
+// rounded blue square with the "CH" monogram). The Carouge crest is
+// kept separate and only shown for the Carouge team inside the app.
+const icons = [
+  { src: path.resolve('assets', 'icon-192.png'), out: 'icon-192.png' },
+  { src: path.resolve('assets', 'icon-512.png'), out: 'icon-512.png' },
+];
+let iconCount = 0;
+for (const { src, out } of icons) {
+  if (!fs.existsSync(src)) {
+    console.warn(`⚠ ${src} missing — skipping ${out}`);
+    continue;
+  }
+  fs.copyFileSync(src, path.join(DIST, out));
+  iconCount += 1;
 }
+console.log(`✓ copied ${iconCount} PWA icon(s) into dist/`);
 
 // ---- 3. Service worker ---------------------------------------------
 

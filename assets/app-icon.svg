@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#006FEE"/>
+      <stop offset="1" stop-color="#3094FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+
+  <!-- Soccer ball accent in the upper-right corner -->
+  <circle cx="400" cy="112" r="48" fill="rgba(255,255,255,0.18)"/>
+  <path d="M400 76 L411.2 100.8 L437.6 101.6 L416.8 117.6 L424 143.2 L400 128.8 L376 143.2 L383.2 117.6 L362.4 101.6 L388.8 100.8 Z"
+        fill="rgba(255,255,255,0.55)"/>
+
+  <!-- "CH" monogram -->
+  <text x="256" y="356"
+        text-anchor="middle"
+        fill="#FFFFFF"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        font-weight="800"
+        font-size="224"
+        letter-spacing="-8">CH</text>
+</svg>
