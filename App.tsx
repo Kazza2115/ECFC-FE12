@@ -17,6 +17,21 @@ import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import { Feather } from '@expo/vector-icons';
 import { FEATHER_FONT_DATA_URI } from '@/assets/featherFontBase64';
+
+// On web, react-native-web emits a noisy "useNativeDriver is not
+// supported" warning every time an Animated.spring / Animated.timing
+// runs with the native driver. The fallback to JS-based animation is
+// fine — we just suppress the warning so the console stays usable.
+if (Platform.OS === 'web' && typeof console !== 'undefined') {
+  const originalWarn = console.warn.bind(console);
+  console.warn = (...args: any[]) => {
+    const first = args[0];
+    if (typeof first === 'string' && first.includes('useNativeDriver')) {
+      return;
+    }
+    originalWarn(...args);
+  };
+}
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -186,10 +201,18 @@ export default function App() {
   const [fontsReady, setFontsReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    Promise.allSettled([
-      Font.loadAsync(Feather.font),
-      ensureFeatherFontWeb(),
-    ]).finally(() => {
+    // On web we install the Feather font ourselves (base64 data URI).
+    // Calling expo-font's Font.loadAsync(Feather.font) there would
+    // trigger an extra fetch to a node_modules path that GitHub Pages
+    // already 403s — useless noise in the console. Native still needs
+    // the regular path so the bundled .ttf is registered.
+    const tasks: Promise<unknown>[] = [];
+    if (Platform.OS !== 'web') {
+      tasks.push(Font.loadAsync(Feather.font));
+    } else {
+      tasks.push(ensureFeatherFontWeb());
+    }
+    Promise.allSettled(tasks).finally(() => {
       if (!cancelled) setFontsReady(true);
     });
     return () => {
