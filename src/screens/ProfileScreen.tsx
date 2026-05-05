@@ -69,6 +69,9 @@ export function ProfileScreen({ navigation }: Props) {
   const [teamSheetName, setTeamSheetName] = useState('');
   const [teamSheetBusy, setTeamSheetBusy] = useState(false);
   const [teamSheetError, setTeamSheetError] = useState<string | null>(null);
+  // Compact team-switcher (dropdown) state.
+  const [teamSwitcherOpen, setTeamSwitcherOpen] = useState(false);
+  const [switchingTeamId, setSwitchingTeamId] = useState<string | null>(null);
 
   // Notes state
   const [notes, setNotes] = useState<CoachNote[]>([]);
@@ -389,7 +392,7 @@ export function ProfileScreen({ navigation }: Props) {
           <AnimatedFadeIn delay={80}>
           <View style={styles.section}>
             <View style={styles.teamsHeader}>
-              <Text style={styles.sectionTitle}>Mes équipes</Text>
+              <Text style={styles.sectionTitle}>Mon équipe</Text>
               <Pressable
                 onPress={() => setTeamSheet({ mode: 'pick' })}
                 style={styles.addBtn}
@@ -399,92 +402,78 @@ export function ProfileScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
-            {(profile?.teams ?? []).map((team) => {
-              const isActive = team.id === profile?.teamId;
-              const isCarougeTeam = team.id === 'ecfc-juniors';
-              const teamHasLogo = !!team.logoUrl || isCarougeTeam;
+            {(() => {
+              const teams = profile?.teams ?? [];
+              const activeTeam = teams.find((t) => t.id === profile?.teamId);
+              const isCarougeTeam = activeTeam?.id === 'ecfc-juniors';
+              const teamHasLogo = !!activeTeam?.logoUrl || isCarougeTeam;
+              const hasMultiple = teams.length > 1;
+              if (!activeTeam) return null;
               return (
-                <Pressable
-                  key={team.id}
-                  onPress={() => {
-                    if (isActive) return;
-                    switchTeam(team.id).catch((err: any) =>
-                      setTeamError(err?.message ?? 'Impossible de changer d\'équipe.'),
-                    );
-                  }}
-                  style={({ pressed }) => [pressed && !isActive && { opacity: 0.85 }]}
-                >
-                  <Card
-                    style={[
-                      styles.teamCard,
-                      isActive && styles.teamCardActive,
-                    ]}
-                  >
-                    <View style={styles.teamRow}>
-                      <Pressable
-                        onPress={
-                          isActive && !logoBusy ? handleTeamLogo : undefined
-                        }
-                        style={styles.teamLogoWrap}
-                        disabled={!isActive || logoBusy}
-                      >
-                        {teamHasLogo ? (
-                          <TeamLogo
-                            teamId={team.id}
-                            logoUrl={team.logoUrl}
-                            size={48}
-                          />
-                        ) : (
-                          <View style={styles.teamLogoPlaceholder}>
-                            <Feather
-                              name="plus"
-                              size={20}
-                              color={colors.primary}
-                            />
-                          </View>
-                        )}
-                        {isActive ? (
-                          <View style={styles.teamLogoBadge}>
-                            {logoBusy ? (
-                              <ActivityIndicator size="small" />
-                            ) : (
-                              <Text style={styles.cameraGlyph}>📷</Text>
-                            )}
-                          </View>
-                        ) : null}
-                      </Pressable>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={styles.teamName} numberOfLines={1}>
-                          {team.name}
-                        </Text>
-                        <Text style={styles.teamHint}>
-                          {isActive
-                            ? teamHasLogo
-                              ? 'Tape sur le blason pour le changer'
-                              : 'Tape pour ajouter un blason'
-                            : 'Tape pour basculer sur cette équipe'}
-                        </Text>
-                      </View>
-                      {isActive ? (
-                        <View style={styles.teamActiveBadge}>
+                <Card style={[styles.teamCard, styles.teamCardActive]}>
+                  <View style={styles.teamRow}>
+                    <Pressable
+                      onPress={!logoBusy ? handleTeamLogo : undefined}
+                      style={styles.teamLogoWrap}
+                      disabled={logoBusy}
+                    >
+                      {teamHasLogo ? (
+                        <TeamLogo
+                          teamId={activeTeam.id}
+                          logoUrl={activeTeam.logoUrl}
+                          size={48}
+                        />
+                      ) : (
+                        <View style={styles.teamLogoPlaceholder}>
                           <Feather
-                            name="check"
-                            size={14}
-                            color={colors.onPrimary}
+                            name="plus"
+                            size={20}
+                            color={colors.primary}
                           />
                         </View>
-                      ) : (
+                      )}
+                      <View style={styles.teamLogoBadge}>
+                        {logoBusy ? (
+                          <ActivityIndicator size="small" />
+                        ) : (
+                          <Text style={styles.cameraGlyph}>📷</Text>
+                        )}
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        if (hasMultiple) setTeamSwitcherOpen(true);
+                      }}
+                      style={({ pressed }) => [
+                        styles.teamSelect,
+                        pressed && hasMultiple && { opacity: 0.85 },
+                      ]}
+                      disabled={!hasMultiple}
+                    >
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.teamName} numberOfLines={1}>
+                          {activeTeam.name}
+                        </Text>
+                        <Text style={styles.teamHint}>
+                          {hasMultiple
+                            ? `Tape pour changer d'équipe (${teams.length})`
+                            : teamHasLogo
+                              ? 'Tape sur le blason pour le changer'
+                              : 'Tape sur le blason pour en ajouter un'}
+                        </Text>
+                      </View>
+                      {hasMultiple ? (
                         <Feather
-                          name="chevron-right"
+                          name="chevron-down"
                           size={18}
                           color={colors.textMuted}
                         />
-                      )}
-                    </View>
-                  </Card>
-                </Pressable>
+                      ) : null}
+                    </Pressable>
+                  </View>
+                </Card>
               );
-            })}
+            })()}
 
             {teamError ? (
               <Text style={styles.error}>{teamError}</Text>
@@ -784,6 +773,81 @@ export function ProfileScreen({ navigation }: Props) {
           </View>
         ) : null}
       </BottomSheet>
+
+      <BottomSheet
+        visible={teamSwitcherOpen}
+        title="Choisir une équipe"
+        onClose={() => setTeamSwitcherOpen(false)}
+      >
+        <View style={{ gap: spacing.sm }}>
+          {(profile?.teams ?? []).map((team) => {
+            const isActive = team.id === profile?.teamId;
+            const isSwitching = switchingTeamId === team.id;
+            return (
+              <Pressable
+                key={team.id}
+                disabled={isSwitching}
+                onPress={async () => {
+                  if (isActive) {
+                    setTeamSwitcherOpen(false);
+                    return;
+                  }
+                  setTeamError(null);
+                  setSwitchingTeamId(team.id);
+                  try {
+                    await switchTeam(team.id);
+                    setTeamSwitcherOpen(false);
+                  } catch (err: any) {
+                    setTeamError(
+                      err?.message ?? "Impossible de changer d'équipe.",
+                    );
+                  } finally {
+                    setSwitchingTeamId(null);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.teamPickRow,
+                  isActive && styles.teamPickRowActive,
+                  pressed && !isActive && { opacity: 0.85 },
+                ]}
+              >
+                <TeamLogo
+                  teamId={team.id}
+                  logoUrl={team.logoUrl}
+                  size={40}
+                />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.teamName} numberOfLines={1}>
+                    {team.name}
+                  </Text>
+                  {isActive ? (
+                    <Text style={styles.teamPickActiveLabel}>
+                      Équipe active
+                    </Text>
+                  ) : null}
+                </View>
+                {isActive ? (
+                  <View style={styles.teamActiveBadge}>
+                    <Feather
+                      name="check"
+                      size={14}
+                      color={colors.onPrimary}
+                    />
+                  </View>
+                ) : isSwitching ? (
+                  <ActivityIndicator size="small" />
+                ) : (
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={colors.textMuted}
+                  />
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -1008,6 +1072,34 @@ const makeStyles = (c: ThemedColors) =>
       ...typography.caption,
       color: c.textMuted,
       marginTop: 2,
+    },
+    teamSelect: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      minWidth: 0,
+    },
+    teamPickRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.background,
+    },
+    teamPickRowActive: {
+      borderColor: c.primary,
+      backgroundColor: c.primarySoft,
+    },
+    teamPickActiveLabel: {
+      ...typography.caption,
+      color: c.primary,
+      marginTop: 2,
+      fontWeight: '700',
     },
     notesLoading: {
       paddingVertical: spacing.lg,
