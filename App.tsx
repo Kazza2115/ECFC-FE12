@@ -7,6 +7,8 @@ import {
 } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import * as Font from 'expo-font';
+import { Feather } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DataProvider, useData } from '@/context/DataContext';
 import { ThemeProvider, useTheme } from '@/context/ThemeContext';
@@ -133,11 +135,27 @@ function AuthGate() {
 }
 
 export default function App() {
+  // Preload @expo/vector-icons fonts so Feather glyphs render the
+  // first time they appear (otherwise web shows empty boxes until the
+  // font streams in).
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    Font.loadAsync(Feather.font)
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setFontsReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <AuthProvider>
-          <AuthGate />
+          {fontsReady ? <AuthGate /> : <Loading />}
         </AuthProvider>
       </ThemeProvider>
     </SafeAreaProvider>
