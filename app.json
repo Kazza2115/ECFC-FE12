@@ -1,35 +1,35 @@
 {
   "expo": {
-    "name": "ECFC Présences",
-    "slug": "ecfc-attendance",
+    "name": "Coach Hub",
+    "slug": "coach-hub",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "scheme": "ecfc",
-    "icon": "./assets/logo.png",
+    "scheme": "coachhub",
+    "icon": "./assets/icon-512.png",
     "splash": {
-      "image": "./assets/logo.png",
+      "image": "./assets/icon-512.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#006FEE"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ch.etoilecarougefc.attendance"
+      "bundleIdentifier": "app.coachhub.attendance"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/icon-512.png",
+        "backgroundColor": "#006FEE"
       },
-      "package": "ch.etoilecarougefc.attendance"
+      "package": "app.coachhub.attendance"
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/logo.png"
+      "favicon": "./assets/icon-192.png"
     },
     "plugins": [
       [
