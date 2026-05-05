@@ -111,6 +111,7 @@ export function SessionsListScreen({ navigation }: Props) {
         {filtered.length === 0 ? (
           <Card>
             <EmptyState
+              art="sessions"
               title={
                 filter === 'match'
                   ? 'Aucun match'

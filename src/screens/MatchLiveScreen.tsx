@@ -427,6 +427,7 @@ export function MatchLiveScreen({ route, navigation }: Props) {
         {convoqués.length === 0 ? (
           <Card>
             <EmptyState
+              art="players"
               title="Aucun joueur convoqué"
               description="Retourne sur la convocation du match pour convoquer des joueurs."
             />

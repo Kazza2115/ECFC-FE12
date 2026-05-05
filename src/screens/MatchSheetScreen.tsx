@@ -204,6 +204,7 @@ export function MatchSheetScreen({ route, navigation }: Props) {
         {participants.length === 0 ? (
           <Card>
             <EmptyState
+              art="events"
               title="Pas encore de données"
               description="Aucun titulaire, aucun évènement n'a été enregistré pour ce match."
             />

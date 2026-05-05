@@ -123,6 +123,7 @@ export function PlayersScreen({ navigation }: { navigation: Nav }) {
         <View style={styles.emptyWrap}>
           <Card>
             <EmptyState
+              art="players"
               title="Aucun joueur"
               description="Ajoutez vos joueurs pour commencer."
             >

@@ -267,6 +267,7 @@ export function DashboardScreen({ navigation }: { navigation: Nav }) {
         {topPlayers.length === 0 || activeTrainingsCount === 0 ? (
           <Card>
             <EmptyState
+              art="stats"
               title="Pas encore de stats"
               description="Démarrez un entraînement pour commencer à mesurer la présence de vos joueurs."
             />

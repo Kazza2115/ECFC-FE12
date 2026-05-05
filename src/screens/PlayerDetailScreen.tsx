@@ -222,6 +222,7 @@ export function PlayerDetailScreen({ route, navigation }: Props) {
         <Card style={styles.eventsCard}>
           {totals.goals + totals.assists + totals.key + totals.yellow + totals.red === 0 ? (
             <EmptyState
+              art="events"
               title="Pas encore d'évènement"
               description="Aucun but, passe ou évènement enregistré pour ce joueur."
             />

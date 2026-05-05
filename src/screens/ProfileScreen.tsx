@@ -16,6 +16,7 @@ import { AnimatedFadeIn } from '@/components/AnimatedFadeIn';
 import { Avatar } from '@/components/Avatar';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import { Skeleton } from '@/components/Skeleton';
 import { TeamLogo } from '@/components/TeamLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -472,12 +473,12 @@ export function ProfileScreen({ navigation }: Props) {
                 ))}
               </View>
             ) : notes.length === 0 && editingNoteId !== 'new' ? (
-              <Card style={styles.emptyCard}>
-                <Text style={styles.emptyTitle}>Aucune note</Text>
-                <Text style={styles.emptyHint}>
-                  Garde tes idées d'entraînement, retours match, choses à
-                  retenir : tape sur ＋ pour en ajouter une.
-                </Text>
+              <Card>
+                <EmptyState
+                  art="notes"
+                  title="Aucune note"
+                  description="Garde tes idées d'entraînement, retours match, choses à retenir : tape sur ＋ pour en ajouter une."
+                />
               </Card>
             ) : (
               notes.map((n) => {

@@ -162,6 +162,7 @@ export function StatsScreen() {
           ) : (
             <Card>
               <EmptyState
+                art="stats"
                 title="Pas encore d'entraînement"
                 description="Crée un entraînement et marque les présences pour voir l'assiduité de ton effectif."
               />
@@ -180,6 +181,7 @@ export function StatsScreen() {
         ) : (
           <Card>
             <EmptyState
+              art="sessions"
               title="Pas encore de match"
               description="Crée un match, convoque les joueurs et lance le Mode Live pour voir apparaître les stats."
             />
