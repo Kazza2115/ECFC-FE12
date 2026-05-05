@@ -142,31 +142,65 @@ function AuthGate() {
   );
 }
 
-// Resolve the bundled Feather TTF asset and inject a `@font-face`
-// rule into the document head so the browser can render the Feather
-// glyphs. Belt-and-braces in addition to expo-font, which has been
-// flaky on the GitHub Pages deployment.
-async function injectFeatherFontFaceWeb(): Promise<void> {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-  if (document.getElementById('__ecfc_feather_font__')) return;
+// jsDelivr-hosted Feather TTF used as a CDN fallback in case the
+// bundled-asset URL resolution misbehaves on a particular deployment
+// (the GitHub Pages baseUrl / expo-asset combination has been
+// inconsistent on web).
+const FEATHER_CDN_URL =
+  'https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.0/Fonts/Feather.ttf';
+
+async function resolveBundledFeatherUrl(): Promise<string | null> {
   try {
     const featherTtf = require(
       '@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ttf',
     );
     const asset = Asset.fromModule(featherTtf);
     await asset.downloadAsync();
-    const url = asset.localUri || asset.uri;
-    if (!url) return;
+    return asset.localUri || asset.uri || null;
+  } catch {
+    return null;
+  }
+}
+
+// Make sure the browser knows about Feather by (1) injecting a CSS
+// @font-face rule with both bundled and CDN URLs (the browser will
+// gracefully fall back to the CDN if the bundled URL 404s), and
+// (2) explicitly loading via the FontFace API so document.fonts is
+// populated before icons render.
+async function ensureFeatherFontWeb(): Promise<void> {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if ((globalThis as any).__ecfcFeatherFontReady) return;
+
+  const bundledUrl = await resolveBundledFeatherUrl();
+  const sources = [bundledUrl, FEATHER_CDN_URL]
+    .filter((u): u is string => !!u)
+    .map((u) => `url('${u}') format('truetype')`)
+    .join(', ');
+
+  if (!sources) return;
+
+  if (!document.getElementById('__ecfc_feather_font__')) {
     const styleEl = document.createElement('style');
     styleEl.id = '__ecfc_feather_font__';
     styleEl.textContent =
-      `@font-face { font-family: 'Feather'; ` +
-      `src: url('${url}') format('truetype'); ` +
+      `@font-face { font-family: 'Feather'; src: ${sources}; ` +
       `font-display: block; }`;
     document.head.appendChild(styleEl);
-  } catch {
-    // Swallow — expo-font's loadAsync still has a chance to succeed.
   }
+
+  const FF = (globalThis as any).FontFace;
+  const fonts = (document as any).fonts;
+  if (FF && fonts && typeof fonts.add === 'function') {
+    try {
+      const face = new FF('Feather', sources);
+      await face.load();
+      fonts.add(face);
+    } catch {
+      // fall through — at least the @font-face rule is installed.
+    }
+  }
+
+  (globalThis as any).__ecfcFeatherFontReady = true;
 }
 
 export default function App() {
@@ -180,7 +214,7 @@ export default function App() {
     let cancelled = false;
     Promise.allSettled([
       Font.loadAsync(Feather.font),
-      injectFeatherFontFaceWeb(),
+      ensureFeatherFontWeb(),
     ]).finally(() => {
       if (!cancelled) setFontsReady(true);
     });
