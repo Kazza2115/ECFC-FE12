@@ -609,6 +609,7 @@ export const auth = {
     // exist yet (legacy schema), fall back to the single team_id
     // stored on the profile so the coach keeps access to their team.
     let teamIds: string[] = [];
+    let needsLegacyBackfill = false;
     {
       const res = await supabase
         .from('ecfc_coach_teams')
@@ -621,8 +622,14 @@ export const auth = {
         throw res.error;
       } else {
         teamIds = (res.data ?? []).map((r) => r.team_id);
-        if (teamIds.length === 0 && profileRow.team_id) {
-          teamIds = [profileRow.team_id];
+        // Some coaches were created before the multi-team migration:
+        // their first team lives only on profile.team_id and never
+        // got a row in ecfc_coach_teams. Make sure that legacy team
+        // is still surfaced in the dropdown so the coach doesn't
+        // appear to "lose" it after joining a second team.
+        if (profileRow.team_id && !teamIds.includes(profileRow.team_id)) {
+          teamIds.unshift(profileRow.team_id);
+          needsLegacyBackfill = true;
         }
       }
     }
@@ -663,6 +670,21 @@ export const auth = {
       // Coach has a profile row but no team yet — let the caller
       // decide what to do (typically: route to the onboarding screen).
       return null;
+    }
+
+    // One-shot backfill: insert the legacy team into the membership
+    // table so the next fetch is clean and other multi-team flows
+    // (joinTeam, leaveTeam, RLS via ecfc_coach_teams) recognise it.
+    // Fire-and-forget — failures are silently retried on the next
+    // fetchProfile.
+    if (needsLegacyBackfill && profileRow.team_id) {
+      void supabase
+        .from('ecfc_coach_teams')
+        .upsert(
+          { user_id: userId, team_id: profileRow.team_id, role: 'coach' },
+          { onConflict: 'user_id,team_id' },
+        )
+        .then(() => {});
     }
 
     return {
